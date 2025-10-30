@@ -9,11 +9,13 @@ and access attempts are illegal.
 import base64
 import configparser
 import nacl
+from nacl import secret
 import os
 import click
 import paramiko
 import socket
 import multiprocessing
+from logging.config import dictConfig
 import logging
 from scapy.all import ARP, Ether, srp
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -56,11 +58,18 @@ LOGGING_CONFIG = {
 logging.config.dictConfig(LOGGING_CONFIG)
 
 CURRENT_DIRECTORY      = os.path.abspath( os.path.dirname(__file__) )
+PARENT_DIRECTORY       = os.path.abspath( os.path.dirname(CURRENT_DIRECTORY) )
+VERSION_FILE           = "VERSION.txt"
+
 logger                 = logging.getLogger( '{}'.format(NAME) )
 
 # Suppress paramiko warnings for demo purposes
 warnings.filterwarnings("ignore")
 logging.getLogger("paramiko").setLevel(logging.WARNING)
+
+def read_version():
+   with open( os.path.join(PARENT_DIRECTORY,VERSION_FILE), 'r' ) as reader:
+       return reader.read()
 
 def read_properties( context ) -> configparser.ConfigParser:
     our_configuration = None
@@ -323,7 +332,13 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
     if debug:
         logging.getLogger().setLevel( logging.DEBUG )   
     
-    
+    ctx.obj["VERSION"] = read_version()
+
+    if not home:
+        ctx.obj["HOME"]    = PARENT_DIRECTORY
+    else:
+        ctx.obj["HOME"]    = home
+
     logger.info( '{} version {} startup'.format(NAME,ctx.obj['VERSION']) )
     ctx.obj['CONFIGURATION'] = read_properties( ctx )      
     logger.info( 'read properties' )
@@ -351,7 +366,6 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
         logger.info( 'updated properties password as {}'.format(enc_pass) )
 
     ctx.obj['DIRECTORY'] = os.path.abspath( sys.executable )
-
 
 @diamondback_client.command(help="Simple helper to start operation for training")
 @click.option('--network', '-n', default='10.0.10.0/24', 
@@ -434,7 +448,6 @@ def basic(ctx, network, username, password, commands, port, skip_discovery, host
         # Return the list of SSH-accessible hosts
         click.echo(f"\n📋 Summary: {len(ssh_hosts)} accessible hosts found")
         return ssh_hosts
-        
     except PermissionError:
         click.echo("\n❌ Error: This script requires root/administrator privileges "
                   "for network scanning.", err=True)
