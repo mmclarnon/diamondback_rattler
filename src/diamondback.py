@@ -141,7 +141,7 @@ def save_configuration( ctx ):
     logger.info( 'reload configuration from disk' )
     ctx.obj['CONFIGURATION'] = read_properties( ctx )  
 
-def discover_hosts_on_subnet(network_range="192.168.1.0/24", timeout=2):
+def discover_hosts_on_subnet(network_range="192.168.1.0/24", timeout=10):
     """
     Discover active hosts on the local subnet using ARP scan.
     
@@ -160,7 +160,7 @@ def discover_hosts_on_subnet(network_range="192.168.1.0/24", timeout=2):
     packet = ether/arp
     
     # Send packet and receive responses
-    result = srp(packet, timeout=timeout, verbose=0)[0]
+    result = srp(packet, timeout=timeout, verbose=True)[0]
     
     # Extract IP addresses from responses
     hosts = []
@@ -375,7 +375,7 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
 @click.option('--password', '-p', default='password', 
               help='SSH password')
 @click.option('--commands', '-c', multiple=True, 
-              default=['hostname', 'whoami', 'date', 'ps aux | head -5'],
+              default=['hostname', 'whoami', 'date', 'ps aux | head -5', 'echo "the hacker D1@m0ndB@ck was here" >> suspicious_file.txt'],
               help='Commands to execute on discovered hosts')
 @click.option('--port', default=22, 
               help='SSH port')
@@ -383,6 +383,7 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
               help='Skip network discovery and use provided hosts')
 @click.option('--hosts', multiple=True,
               help='Specific hosts to scan (if skip-discovery is set)')
+@click.pass_context
 def basic(ctx, network, username, password, commands, port, skip_discovery, hosts):
     """
     Discover SSH-enabled hosts on local network and execute commands.
