@@ -10,10 +10,14 @@
   vars: 
     - workspace_dir: "/home/{{ user }}/workspace"
     - target: pwncat
+    - pwncat_release: 0.5.4
     - remote_directory: "{{ workspace_dir }}/{{ target }}"
+    - pwncat_share_dir: "/home/{{ user }}/.local/share/pwncat"
     - virtual_env: virtualenv
-    - python_version: "3.12"
     - virtual_env_dir: "{{ remote_directory }}/{{ virtual_env }}"
+    - pwncat_plugins_file: pwncat-plugins.tar.gz
+    - pyenv_root: "/home/{{ user }}/workspace/.pyenv"
+    - python_version: "3.11.9"
 
   pre_tasks:
     - name: Run the equivalent of "apt-get update" as a separate step
@@ -25,8 +29,6 @@
         pkg:
         - python3-pip
         - python3-dev
-        - "python{{ python_version }}" 
-        - "python{{ python_version }}-venv"
         - net-tools
         - htop
         - git
@@ -34,6 +36,22 @@
         - curl
         - wget
         - make
+        - build-essential
+        - libssl-dev 
+        - zlib1g-dev 
+        - libbz2-dev 
+        - libreadline-dev 
+        - libsqlite3-dev 
+        - curl 
+        - git 
+        - libncursesw5-dev
+        - xz-utils 
+        - tk-dev 
+        - libxml2-dev 
+        - libxmlsec1-dev 
+        - libffi-dev 
+        - sshpass 
+        - liblzma-dev
 
     - name: Create download directory
       ansible.builtin.file:
@@ -47,7 +65,77 @@
         state: directory
         mode: '0755'
 
+    - name: Create pwncat Share Directory
+      ansible.builtin.file:
+        path: "{{ pwncat_share_dir }}"
+        state: directory
+        mode: '0755'
+
+    - name: Check if pyenv is already installed
+      stat:
+        path: "{{ pyenv_root }}/bin/pyenv"
+      register: pyenv_installed
+      become: no
+
+    - name: Install pyenv
+      shell: |
+        curl https://pyenv.run | bash
+      args:
+        creates: "{{ pyenv_root }}/bin/pyenv"
+      become: no
+      when: not pyenv_installed.stat.exists
+
+    - name: Add pyenv to bashrc
+      blockinfile:
+        path: "/home/{{ ansible_user }}/.bashrc"
+        block: |
+          export PYENV_ROOT="$HOME/.pyenv"
+          export PATH="$PYENV_ROOT/bin:$PATH"
+          eval "$(pyenv init -)"
+        marker: "# {mark} ANSIBLE MANAGED BLOCK - PYENV"
+        create: yes
+      become: no
+
+    - name: Check if Python {{ python_version }} shim exists
+      stat:
+        path: "{{ pyenv_root }}/shims/python3.11"
+      register: python_shim
+      become: no
+
+    - name: Install Python {{ python_version }} via pyenv
+      shell: |
+        export PYENV_ROOT="{{ pyenv_root }}"
+        export PATH="$PYENV_ROOT/bin:$PATH"
+        eval "$(pyenv init -)"
+        pyenv install {{ python_version }}
+      args:
+        executable: /bin/bash
+      become: no
+      when: not python_shim.stat.exists
+
   tasks:
+    - name: Set Python {{ python_version }} as global version
+      shell: |
+        export PYENV_ROOT="{{ pyenv_root }}"
+        export PATH="$PYENV_ROOT/bin:$PATH"
+        eval "$(pyenv init -)"
+        pyenv global {{ python_version }}
+      args:
+        executable: /bin/bash
+      become: no
+      when: not python_shim.stat.exists
+
+    - name: Verify Python installation
+      shell: |
+        export PYENV_ROOT="{{ pyenv_root }}"
+        export PATH="$PYENV_ROOT/bin:$PATH"
+        eval "$(pyenv init -)"
+        python3.11 --version
+      args:
+        executable: /bin/bash
+      register: python_version_output
+      become: no  
+      
     - name: disable IPv6
       sysctl:
         name: "{{item.name}}"
@@ -58,6 +146,7 @@
         - { "name": net.ipv6.conf.all.disable_ipv6, "value": 1 }
         - { "name": net.ipv6.conf.default.disable_ipv6, "value": 1 }
         - { "name": net.ipv6.conf.lo.disable_ipv6, "value": 1 }
+
     - name: Cleanup unused packages
       apt:
         autoremove: yes
@@ -66,12 +155,12 @@
       copy:
         src: "../application/{{ target }}/"
         dest: "{{ remote_directory }}"
-        owner: root
-        group: root
+        owner: "{{ user }}"
+        group: "{{ user }}"
         mode: 0755  
 
     - name: Create virtual env for pwncat application
-      ansible.builtin.command: "python3 -m venv {{ virtual_env }}"
+      ansible.builtin.command: "{{ pyenv_root }}/shims/python3.11 -m venv {{ virtual_env }}"
       args:
         chdir: "{{ remote_directory }}"
 
@@ -79,6 +168,12 @@
       ansible.builtin.pip:
         requirements: "{{ remote_directory }}/requirements.txt"
         virtualenv: "{{ virtual_env_dir }}"
+
+    - name: Download & Unarchive pwncat plugins
+      ansible.builtin.unarchive:
+        src: "https://github.com/calebstewart/pwncat/releases/download/v{{ pwncat_release }}/{{ pwncat_plugins_file }}"
+        dest: "{{ pwncat_share_dir }}"
+        remote_src: yes
 
   post_tasks:
     - name: force systemd to reread configs

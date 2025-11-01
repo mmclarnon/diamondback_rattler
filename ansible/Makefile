@@ -2,6 +2,22 @@
 BECOME_PASSWORD = .become_password
 VAULT_PASSWORD = .vault_password
 INVENTORY = inventory/cyberguardian/homenet
+REQUIRED_PACKAGES = build-essential \
+					libssl-dev \
+					zlib1g-dev \
+					libbz2-dev \
+					libreadline-dev \
+					libsqlite3-dev \
+					curl \
+					git \
+					libncursesw5-dev \
+					xz-utils \
+					tk-dev \
+					libxml2-dev \
+					libxmlsec1-dev \
+					libffi-dev \
+					sshpass \
+					liblzma-dev
 
 .PHONY: .become-password .vault_password develop
 
@@ -37,7 +53,7 @@ INVENTORY = inventory/cyberguardian/homenet
 	fi
 
 develop: .become_password .vault_password
-	sudo apt install -y sshpass
+	sudo apt install -y $(REQUIRED_PACKAGES)
 	ansible-galaxy install -r requirements.yml
 
 vault:

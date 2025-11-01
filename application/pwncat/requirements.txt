@@ -1,1 +1,2 @@
 pwncat-cs==0.5.4
+setuptools==80.9.0
