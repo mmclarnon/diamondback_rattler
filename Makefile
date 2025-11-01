@@ -39,6 +39,7 @@ develop:
 	DEBIAN_FRONTEND=noninteractive sudo apt-get install -y $(REQUIRED_PACKAGES)
 	$(VENV) $(VIRTUAL_ENV)
 	@$(PIP) install -r requirements.txt
+	$(MAKE) -C ansible develop
 
 # Builds the app
 $(APPNAME): $(OBJ) 

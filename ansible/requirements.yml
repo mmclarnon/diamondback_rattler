@@ -1,0 +1,18 @@
+roles:
+- src: semuadmin.webmin
+- src: arillso.motd
+- src: geerlingguy.firewall
+- src: geerlingguy.docker
+- src: robertdebock.rsyslog
+- src: robertdebock.aide
+- src: geerlingguy.pip
+- src: robertdebock.docker_compose
+- src: robertdebock.fail2ban
+collections:
+  - name: community.mysql
+  - name: robertdebock.roles
+  - name: community.docker
+  - name: community.proxmox
+  - name: pfsensible.core
+  - name: community.general
+    version: 11.1.0

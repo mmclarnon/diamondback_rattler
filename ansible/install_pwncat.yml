@@ -1,0 +1,86 @@
+###
+# Install in Mark HOMENET
+#
+# ansible-playbook -i inventory/cyberguardian/homenet --vault-password-file .vault_password --become-password-file .become_password install_pwncat.yml --extra-vars '{ "user":"sysadmin" }'
+#
+- hosts: controller
+  gather_facts: true
+  become: yes
+  remote_user: "{{ user }}"  
+  vars: 
+    - workspace_dir: "/home/{{ user }}/workspace"
+    - target: pwncat
+    - remote_directory: "{{ workspace_dir }}/{{ target }}"
+    - virtual_env: virtualenv
+    - python_version: "3.12"
+    - virtual_env_dir: "{{ remote_directory }}/{{ virtual_env }}"
+
+  pre_tasks:
+    - name: Run the equivalent of "apt-get update" as a separate step
+      apt:
+        update_cache: yes
+
+    - name: Install required packages
+      apt:
+        pkg:
+        - python3-pip
+        - python3-dev
+        - "python{{ python_version }}" 
+        - "python{{ python_version }}-venv"
+        - net-tools
+        - htop
+        - git
+        - gnupg
+        - curl
+        - wget
+        - make
+
+    - name: Create download directory
+      ansible.builtin.file:
+        path: "/home/{{ user }}/Downloads"
+        state: directory
+        mode: '0755'
+
+    - name: Create workspace directory
+      ansible.builtin.file:
+        path: "{{ workspace_dir }}"
+        state: directory
+        mode: '0755'
+
+  tasks:
+    - name: disable IPv6
+      sysctl:
+        name: "{{item.name}}"
+        value: "{{item.value}}"
+        state: present
+        reload: yes
+      with_items:
+        - { "name": net.ipv6.conf.all.disable_ipv6, "value": 1 }
+        - { "name": net.ipv6.conf.default.disable_ipv6, "value": 1 }
+        - { "name": net.ipv6.conf.lo.disable_ipv6, "value": 1 }
+    - name: Cleanup unused packages
+      apt:
+        autoremove: yes
+
+    - name: Copy application files to remote host
+      copy:
+        src: "../application/{{ target }}/"
+        dest: "{{ remote_directory }}"
+        owner: root
+        group: root
+        mode: 0755  
+
+    - name: Create virtual env for pwncat application
+      ansible.builtin.command: "python3 -m venv {{ virtual_env }}"
+      args:
+        chdir: "{{ remote_directory }}"
+
+    - name: Install system python requirements
+      ansible.builtin.pip:
+        requirements: "{{ remote_directory }}/requirements.txt"
+        virtualenv: "{{ virtual_env_dir }}"
+
+  post_tasks:
+    - name: force systemd to reread configs
+      ansible.builtin.systemd:
+        daemon_reload: yes 
