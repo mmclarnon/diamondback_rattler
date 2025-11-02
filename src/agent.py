@@ -1,4 +1,5 @@
 import logging
+import multiprocessing
 import os
 import threading
 import time
@@ -16,7 +17,11 @@ class Client:
         self.startup_time       = time.time( )
         self.cpu_info           = cpuinfo.get_cpu_info()
         self.available_memory   = int(psutil.virtual_memory()[0]/1024)/1024
-        self.set_hosts( hosts )
+
+        if hosts:
+            self.set_hosts( hosts )
+        else:
+            self.set_hosts( [] )
 
         if not context:
             self.path_to_configuration    = os.path.join( PARENT_DIRECTORY, DEFAULT_CONFIGURATION_FILE )
@@ -25,7 +30,12 @@ class Client:
         else:
             self.configuration = self.context.obj['CONFIGURATION']
 
-        self.stop_event = stop_event
+        if not stop_event:
+            self.stop_event = threading.Event( )
+        else:
+            self.stop_event = stop_event
+        # Create queue for return value
+        self.action_results = multiprocessing.Queue()
 
         self.actions_log = []
 
@@ -41,6 +51,7 @@ class Client:
         self.actions_log.append( action )
 
     def set_hosts( self, hosts ):
+        print(hosts)
         self.hosts = hosts
     
     def  get_hosts( self ):
@@ -68,9 +79,9 @@ class Diamondback( Client ):
         self.logger.info( 'starting agent' )
 
         if not self.skip_discovery:
-            a = ARPScan( )
-            a.start( )
-            a.join( )
+            self.logger.info( 'stating initial discovery' )
+            a = ARPScan( self.action_results, target_address=get_network_cidr_platform_specific() )
+            a.run( )
             self.logger.info( 'arp scan completed...' )
             self.logger.info( a.get_output() )
             self.set_hosts( a.get_output() )
@@ -85,9 +96,9 @@ class Diamondback( Client ):
 
             if not self.skip_discovery:
                 self.logger.info( '(re)discover live hosts on LAN')
-                a = ARPScan( )
-                a.start( )
-                a.join( )
+                a = ARPScan( self.action_results, target_address=get_network_cidr_platform_specific() )
+                a.run( )
+
                 self.logger.info( 'arp scan completed...' )
                 self.logger.info( a.get_output() )
                 self.set_hosts( a.get_output() )            
@@ -95,13 +106,12 @@ class Diamondback( Client ):
             self.logger.info( 'check for SSH targets' )
             for h in self.get_hosts( ):
                 self.logger.info( f'checking {h} for SSH' )
-                a = SSHConnectionAttempt( h, username=self.get_username(), password=self.get_password() )
-                a.start( )
-                a.join( )
+                a = SSHConnectionAttempt( self.action_results, target_address=h, username=self.get_username(), password=self.get_password() )
+                a.run( )
                 self.logger.info( 'SSH connection attempt complete' )
                 if a.get_output( ):
                     self.logger.info( 'this host has ACTIVE ssh...' )
-                    valid_ssh_targets.append( a )
+                    valid_ssh_targets.append( h )
                 else:
                     self.logger.info( 'this host does not have active SSH' )
 

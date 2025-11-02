@@ -22,15 +22,31 @@ def set_variable_on_completion(variable_name, value):
         return wrapper
     return decorator
 
-class Action( Process ):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)  # Call parent's __init__
+class Action:
+    def __init__( self, *args, **kwargs ):
+        super().__init__( )  # Call parent's __init__
         if 'input' in kwargs:
             self.input = kwargs['input']
         else:
             self.input = None
 
         self.start_time = time.time() 
+
+        if 'username' in kwargs:
+            self.username = kwargs['username']
+        else:
+            self.username = None
+
+        if 'password' in kwargs:
+            self.password = kwargs['password']
+        else:
+            self.password = None
+
+        if 'target_address' in kwargs:
+            self.target_address = kwargs['target_address']
+            self.set_input( self.target_address )
+        else:
+            self.target_address = None
 
         self.output = None
 
@@ -47,15 +63,15 @@ class Action( Process ):
         self.output = output
 
 class ARPScan( Action ):
-    def __init__( self, target=None ):
-        super.init( input=target )
+    def __init__( self, *args, **kwargs ):
+        super().__init__( *args, **kwargs )
         self.logger = logging.getLogger( 'arpscan' )
         self.logger.info( 'initializing ARPScan action' )
 
         i = self.get_input( )
         self.logger.info( f'using supplied target of {i}' )
 
-    def discover_hosts_on_subnet(self, network_range="192.168.1.0/24", timeout=10):
+    def discover_hosts_on_subnet( self, network_range=None, timeout=10 ):
         """
         Discover active hosts on the local subnet using ARP scan.
         
@@ -85,20 +101,18 @@ class ARPScan( Action ):
             hosts.append(received.psrc)
 
         self.set_output( hosts )
-    
+        self.logger.info( self.get_output() )
+        
     def run( self ):
         self.logger.info( 'executing ARP Scan action to discover assets on target LAN' )
         self.discover_hosts_on_subnet( )
         self.logger.info( f'arp scan complete, found {len(self.get_output())} hosts' )
 
 class SSHConnectionAttempt( Action ):
-    def __init__( self, target=None, username=None, password=None ):
-        super.init( input=target )
+    def __init__( self, *args, **kwargs ):
+        super().__init__( self, *args, **kwargs )
         self.logger = logging.getLogger( 'sshconnection' )
         self.logger.info( 'initializing SSH Conection Attempt action' )
-
-        self.username = username
-        self.password = password
 
         i = self.get_input( )
         self.logger.info( f'using supplied target of {i}' )
