@@ -1,8 +1,5 @@
 [network]
 controller ansible_host=10.0.0.252 ansible_user=sysadmin
 
-[virtual]
-proxmox ansible_host=10.0.10.6 ansible_user=root
-proxmox03 ansible_host=10.0.10.7 ansible_user=root
-virt01 ansible_host=10.0.10.11 ansible_user=root
-virt02 ansible_host=10.0.10.12 ansible_user=root
+[target]
+desktop-r1vhsb  ansible_host=10.0.0.102 ansible_user=sysadmin ansible_connection=winrm

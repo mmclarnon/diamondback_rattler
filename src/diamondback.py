@@ -12,16 +12,17 @@ import nacl
 from nacl import secret
 import os
 import click
-import paramiko
-import socket
 import multiprocessing
 from logging.config import dictConfig
 import logging
-from scapy.all import ARP, Ether, srp
-from concurrent.futures import ThreadPoolExecutor, as_completed
+
 import warnings
 import sys
 import time
+
+import threading
+
+from agent import *
 
 NAME = 'diamondback'
 OUR_CONFIGURATION_FILE = "configuration.ini"
@@ -141,168 +142,6 @@ def save_configuration( ctx ):
     logger.info( 'reload configuration from disk' )
     ctx.obj['CONFIGURATION'] = read_properties( ctx )  
 
-def discover_hosts_on_subnet(network_range="192.168.1.0/24", timeout=10):
-    """
-    Discover active hosts on the local subnet using ARP scan.
-    
-    Args:
-        network_range: CIDR notation of the network to scan
-        timeout: Timeout for ARP responses
-    
-    Returns:
-        List of IP addresses of discovered hosts
-    """
-    click.echo(f"Scanning network: {network_range}")
-    
-    # Create ARP packet
-    arp = ARP(pdst=network_range)
-    ether = Ether(dst="ff:ff:ff:ff:ff:ff")
-    packet = ether/arp
-    
-    # Send packet and receive responses
-    result = srp(packet, timeout=timeout, verbose=True)[0]
-    
-    # Extract IP addresses from responses
-    hosts = []
-    for sent, received in result:
-        hosts.append(received.psrc)
-    
-    click.echo(f"Discovered {len(hosts)} hosts on the network")
-    return hosts
-
-def check_ssh_access(host, username, password, port=22, timeout=3):
-    """
-    Check if SSH access is available with given credentials.
-    
-    Args:
-        host: IP address of the host
-        username: SSH username
-        password: SSH password
-        port: SSH port (default 22)
-        timeout: Connection timeout
-    
-    Returns:
-        True if SSH access successful, False otherwise
-    """
-    try:
-        # Create SSH client
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        # Attempt connection
-        client.connect(
-            hostname=host,
-            port=port,
-            username=username,
-            password=password,
-            timeout=timeout,
-            allow_agent=False,
-            look_for_keys=False
-        )
-        
-        # Close connection
-        client.close()
-        return True
-        
-    except (paramiko.AuthenticationException, 
-            paramiko.SSHException, 
-            socket.timeout, 
-            socket.error):
-        return False
-
-def execute_commands_on_host(host, username, password, commands, port=22):
-    """
-    Execute commands on a remote host via SSH.
-    
-    Args:
-        host: IP address of the host
-        username: SSH username
-        password: SSH password
-        commands: List of commands to execute
-        port: SSH port
-    """
-    click.echo(f"\n[Process {multiprocessing.current_process().pid}] "
-               f"Connecting to {host}")
-    
-    try:
-        # Create SSH client
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        # Connect to host
-        client.connect(
-            hostname=host,
-            port=port,
-            username=username,
-            password=password,
-            timeout=5,
-            allow_agent=False,
-            look_for_keys=False
-        )
-        
-        click.echo(f"[{host}] Successfully connected")
-        
-        # Execute each command
-        for command in commands:
-            click.echo(f"[{host}] Executing: {command}")
-            
-            stdin, stdout, stderr = client.exec_command(command)
-            
-            # Read output
-            output = stdout.read().decode('utf-8').strip()
-            error = stderr.read().decode('utf-8').strip()
-            
-            if output:
-                click.echo(f"[{host}] Output:\n{output[:200]}")  # Limit output length
-            if error:
-                click.echo(f"[{host}] Error: {error}", err=True)
-            
-            time.sleep(0.5)  # Small delay between commands
-        
-        # Close connection
-        client.close()
-        click.echo(f"[{host}] Connection closed")
-        
-    except Exception as e:
-        click.echo(f"[{host}] Error: {str(e)}", err=True)
-
-def scan_hosts_for_ssh(hosts, username, password):
-    """
-    Scan hosts for SSH access with given credentials.
-    
-    Args:
-        hosts: List of IP addresses to scan
-        username: SSH username
-        password: SSH password
-    
-    Returns:
-        List of IP addresses with successful SSH access
-    """
-    accessible_hosts = []
-    
-    click.echo(f"\nChecking SSH access on {len(hosts)} hosts...")
-    
-    with ThreadPoolExecutor(max_workers=20) as executor:
-        # Submit all tasks
-        future_to_host = {
-            executor.submit(check_ssh_access, host, username, password): host 
-            for host in hosts
-        }
-        
-        # Process results as they complete
-        for future in as_completed(future_to_host):
-            host = future_to_host[future]
-            try:
-                if future.result():
-                    accessible_hosts.append(host)
-                    click.echo(f"✓ SSH access successful: {host}")
-                else:
-                    click.echo(f"✗ SSH access failed: {host}")
-            except Exception as e:
-                click.echo(f"✗ Error checking {host}: {str(e)}", err=True)
-    
-    return accessible_hosts
-
 @click.group()
 @click.option( '-c', '--configuration' )
 @click.option( '-q', '--quiet', is_flag=True )
@@ -365,7 +204,8 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
 
         logger.info( 'updated properties password as {}'.format(enc_pass) )
 
-    ctx.obj['DIRECTORY'] = os.path.abspath( sys.executable )
+    ctx.obj['STOP_EVENT'] = threading.Event( ) 
+    ctx.obj['DIRECTORY']  = os.path.abspath( sys.executable )
 
 @diamondback_client.command(help="Simple helper to start operation for training")
 @click.option('--network', '-n', default='10.0.10.0/24', 
@@ -386,45 +226,21 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
 @click.pass_context
 def basic(ctx, network, username, password, commands, port, skip_discovery, hosts):
     """
-    Discover SSH-enabled hosts on local network and execute commands.
-    
-    WARNING: Only use on networks you own or have permission to scan!
+    basic functionality for the Diamondback Rattler malware. This should execute
+    simple remote actions that a junior or entry-level analyst can spot with some 
+    minor hand-holding. This should run until the user presses CTRL-C to cancel. 
     """
-    
-    click.echo("=" * 60)
-    click.echo("SSH Network Discovery and Command Execution Tool")
-    click.echo("=" * 60)
-    click.echo("\n⚠️  WARNING: Only use on networks you own or have permission to scan!")
-    click.echo("⚠️  Unauthorized access to computer systems is illegal!\n")
-    
-    # Confirm before proceeding
-    if not click.confirm("Do you have permission to scan this network?"):
-        click.echo("Exiting...")
-        return
-    
+    ctx.obj['USERNAME'] = username
+    ctx.obj['PASSWORD'] = password
+
+    if ctx.obj['CONFIGURATION']:
+        logger.info( 'initialize diamondback instance with context' )
+        d = Diamondback( ctx )
+    else:
+        logger.info( 'initialize diamondback with empty context' )
+        d = Diamondback()
+
     try:
-        # Step 1: Discover hosts on the network
-        if skip_discovery:
-            discovered_hosts = list(hosts)
-            click.echo(f"Using provided hosts: {discovered_hosts}")
-        else:
-            discovered_hosts = discover_hosts_on_subnet(network)
-            
-            if not discovered_hosts:
-                click.echo("No hosts discovered on the network.")
-                return
-        
-        # Step 2: Check SSH access on discovered hosts
-        ssh_hosts = scan_hosts_for_ssh(discovered_hosts, username, password)
-        
-        if not ssh_hosts:
-            click.echo("\nNo hosts with SSH access found.")
-            return
-        
-        click.echo(f"\n✓ Found {len(ssh_hosts)} hosts with SSH access:")
-        for host in ssh_hosts:
-            click.echo(f"  - {host}")
-        
         # Step 3: Execute commands on SSH-accessible hosts using multiprocessing
         if commands and click.confirm("\nExecute commands on discovered hosts?"):
             click.echo(f"\nExecuting commands on {len(ssh_hosts)} hosts...")
