@@ -74,7 +74,13 @@ class Diamondback( Client ):
         self.skip_discovery = skip_discovery
 
         self.logger.info( 'initialized diamondback training agent...' )
-    
+
+    def set_commands( self, commands ):
+        self.commands = commands
+
+    def get_commands( self ):
+        return self.commands
+
     def run( self ):
         self.logger.info( 'starting agent' )
 
@@ -120,5 +126,9 @@ class Diamondback( Client ):
             self.logger.info( f"\n✓ Found {len(valid_ssh_targets)} active hosts SSH access:" )
             for host in valid_ssh_targets:
                 self.logger.info(f"  - {host}")
+                a = SSHCommandExecution( self.action_results, target_address=host, 
+                                        username=self.get_username(), password=self.get_password(), 
+                                        commands=self.get_commands() )
+                a.run( )
                         
             time.sleep( 5 )

@@ -233,31 +233,13 @@ def basic(ctx, network, commands, port, skip_discovery, hosts):
         logger.info( 'initialize diamondback with empty context' )
         d = Diamondback()
 
+    if not commands:
+        commands = ctx.obj['CONFIGURATION'].get('execution','bash')
+    
+    d.set_commands( commands )
+
     try:
         d.run( )
-        # # Step 3: Execute commands on SSH-accessible hosts using multiprocessing
-        # if commands and click.confirm("\nExecute commands on discovered hosts?"):
-        #     click.echo(f"\nExecuting commands on {len(ssh_hosts)} hosts...")
-        #     click.echo(f"Commands to execute: {list(commands)}\n")
-            
-        #     # Create a process for each host
-        #     processes = []
-        #     for host in ssh_hosts:
-        #         process = multiprocessing.Process(
-        #             target=execute_commands_on_host,
-        #             args=(host, username, password, list(commands), port)
-        #         )
-        #         process.start()
-        #         processes.append(process)
-            
-        #     # Wait for all processes to complete
-        #     for process in processes:
-        #         process.join()
-            
-        #     click.echo("\n✓ Command execution completed on all hosts")
-        
-        # Return the list of SSH-accessible hosts
-        #click.echo(f"\n📋 Summary: {len(ssh_hosts)} accessible hosts found")
         return None
     except PermissionError:
         click.echo("\n❌ Error: This script requires root/administrator privileges "

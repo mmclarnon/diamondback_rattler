@@ -1,11 +1,14 @@
 import logging
+import multiprocessing
 from multiprocessing import Process
+import random
 import time
 
 import paramiko
 from scapy.all import ARP, Ether, srp
 
 from support import *
+from ssh import SSHClientWrapped
 
 def set_variable_on_completion(variable_name, value):
     def decorator(func):
@@ -163,3 +166,78 @@ class SSHConnectionAttempt( Action ):
 
         self.logger.info( 'ssh connection attempt action compelted....' )
         return self
+
+class SSHCommandExecution( Action ):
+    def __init__( self, *args, **kwargs ):
+        super().__init__( self, *args, **kwargs )
+        self.logger = logging.getLogger( 'commandexec' )
+        self.logger.info( 'initializing CmdExec action' )
+
+        i = self.get_input( )
+        self.logger.info( f'using supplied target of {i}' )
+    
+        if 'commands' in kwargs:
+            self.commands = kwargs['commands']
+        else:
+            self.commands = [ 'whoami' ]
+
+    def execute_commands_on_host(self, commands, port=22):
+        """
+        Execute commands on a remote host via SSH.
+        
+        Args:
+            host: IP address of the host
+            username: SSH username
+            password: SSH password
+            commands: List of commands to execute
+            port: SSH port
+        """
+        self.logger.info(f"\n[Process {multiprocessing.current_process().pid}] "
+                f"Connecting to {self.get_input()}")
+        host = self.get_input()
+        try:
+            # Create SSH client
+            client = SSHClientWrapped( self.username, self.password, self.get_input(), port )
+            
+            self.logger.info(f"[{host}] Successfully connected")
+            
+            # Execute each command
+            for command in commands:
+                self.logger.info(f"[{host}] Executing: {command}")
+                
+                r = client.execute( command )
+                
+                if r['out']:
+                    self.logger.info(f"[{host}] Output:\n{r['out'][:200]}")  # Limit output length
+                if r['err']:
+                    self.logger.error(f"[{host}] Error: {r['err']}")
+                
+                time.sleep(random.randint(1,3))  # Small delay between commands
+            
+            # Close connection
+            client.close()
+            self.logger.info(f"[{host}] Connection closed")
+        except Exception as e:
+            self.logger.error(f"[{host}] Error: {str(e)}")
+
+    def run( self ):
+        commands = self.commands
+        # Step 3: Execute commands on SSH-accessible hosts using multiprocessing
+        if commands:
+            self.logger.info(f"\nExecuting commands on host {self.get_input()}...")
+            self.logger.info(f"Commands to execute: {list(commands)}\n")
+            
+            # Create a process for each host
+            processes = []
+            process = multiprocessing.Process(
+                target=self.execute_commands_on_host,
+                args=(list(commands), 22)
+            )
+            process.start()
+            processes.append(process)
+            
+            # Wait for all processes to complete
+            for process in processes:
+                process.join()
+            
+            self.logger.info("\n✓ Command execution completed on all hosts")
