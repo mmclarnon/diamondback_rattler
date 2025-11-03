@@ -10,6 +10,8 @@ from scapy.all import ARP, Ether, srp
 from support import *
 from ssh import SSHClientWrapped
 
+from domain import *
+
 def set_variable_on_completion(variable_name, value):
     def decorator(func):
         def wrapper(*args, **kwargs):
@@ -33,12 +35,22 @@ class Action:
         else:
             self.input = None
 
+        self.variables =    {
+                                'name': 'action',
+                                'start': time.time(),
+                            }
+
         self.start_time = time.time() 
 
         if 'username' in kwargs:
             self.username = kwargs['username']
         else:
             self.username = None
+
+        if 'session' in kwargs:
+            self.session = kwargs['session']
+        else:
+            self.session = None
 
         if 'password' in kwargs:
             self.password = kwargs['password']
@@ -53,6 +65,9 @@ class Action:
 
         self.output = None
 
+    def add_variable( self, name, value ):
+        self.variables['name'] = value
+
     def set_input( self, input ):
         self.input = input
 
@@ -64,6 +79,14 @@ class Action:
 
     def set_output( self, output ):
         self.output = output
+
+    def lookup_command( self, command, service ):
+        self.logger.info( f'lookup command details for {command}' )
+        return self.session.query( Command ).filter( Command.name == command, Command.service == service ).first( )        
+
+    def get_commands_for( self, service ):
+        self.logger.info( f'return all commands for {service}' )
+        return self.session.query( Command ).filter( Command.service == service ).all( )
 
 class ARPScan( Action ):
     def __init__( self, *args, **kwargs ):
@@ -149,7 +172,10 @@ class SSHConnectionAttempt( Action ):
                 allow_agent=False,
                 look_for_keys=False
             )
-            
+
+            transport = client.get_transport()
+            self.banner = transport.get_banner()
+
             # Close connection
             client.close()
             return True
@@ -204,7 +230,16 @@ class SSHCommandExecution( Action ):
             # Execute each command
             for command in commands:
                 self.logger.info(f"[{host}] Executing: {command}")
-                
+
+                c = self.lookup_command( command, 'ssh' )
+                if not c:
+                    new_command         = Command( )
+                    new_command.service = 'ssh'
+                    new_command.name    = command
+
+                    self.session.add( new_command )
+                    self.session.commit( )
+
                 r = client.execute( command )
                 
                 if r['out']:

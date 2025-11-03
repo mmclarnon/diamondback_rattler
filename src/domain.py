@@ -14,6 +14,7 @@ from sqlalchemy.orm import sessionmaker,relationship, backref
 from sqlalchemy.sql import func
 from ipaddress import IPv4Address
 
+from history_meta import Versioned
 
 class Base(DeclarativeBase):
     pass
@@ -34,19 +35,62 @@ def object_as_dict( obj ):
 
     return resulting_dict
 
-class Credential( Base ):
-    __tablename__ = 'credential'
-    id                = mapped_column( Integer, primary_key=True )
-    value             = mapped_column( String, default=None, nullable=True )
-    is_encoded        = mapped_column( Boolean, default=False )
-    note              = mapped_column( Text, nullable=True, default=None )
-    data              = mapped_column( JSON, nullable=True )
+class Victim( Versioned, Base ):
+    __tablename__ = 'victim'
+    id                 = mapped_column( Integer, primary_key=True )
+    name               = mapped_column( String, default=None, nullable=True )
+    internet_facing_ip = mapped_column( String, default=None, nullable=True )
+    has_internet       = mapped_column( Boolean, default=False )
+    created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
+    last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
 
-    is_valid          = mapped_column( Boolean, default=False )
+class LaunchEvent( Versioned, Base ):
+    __tablename__ = 'launch_event'
+    id                 = mapped_column( Integer, primary_key=True )
+    name               = mapped_column( String, default=None, nullable=True )
+    created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
+    last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
 
+class Target( Versioned, Base ):
+    __tablename__ = 'target'
+    id               = mapped_column( Integer, primary_key=True )
+    address          = mapped_column( String, default=None, nullable=True )
+    hardware_address = mapped_column( String, default=None, nullable=True )
+    cpe              = mapped_column( String, default=None, nullable=True )
+    discovery_method = mapped_column( String, default=None, nullable=True )
+    is_encoded       = mapped_column( Boolean, default=False )
+    note             = mapped_column( Text, nullable=True, default=None )
+    data             = mapped_column( JSON, nullable=True )
+    created_date     = mapped_column( DateTime, default=datetime.datetime.utcnow )
+    last_updated     = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
+    services         = relationship("TargetService", back_populates="victim")
 
-    length            = mapped_column( Integer, default=0 )
-    encoded_length    = mapped_column( Integer, default=0 )
+class TargetService( Versioned, Base ):
+    __tablename__ = 'target_service'
+    id                 = mapped_column( Integer, primary_key=True )
+    name               = mapped_column( String, default=None, nullable=True )
+    banner             = mapped_column( String, default=None, nullable=True )
+    port               = mapped_column( Integer, default=0, nullable=True )
+    cpe                = mapped_column( String, default=None, nullable=True )
+    created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
+    victim_id          = mapped_column(Integer, ForeignKey('target.id'), default=None, nullable = True)
+    victim             = relationship("Target", back_populates="services")
+    last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
 
-    created_date      = mapped_column( DateTime, default=datetime.datetime.utcnow )
-    last_scan_date    = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
+class Command( Versioned, Base ):
+    __tablename__ = 'command'
+    id               = mapped_column( Integer, primary_key=True )
+    name             = mapped_column( String, default=None, nullable=True )
+    value            = mapped_column( String, default=None, nullable=True )    
+    service          = mapped_column( String, default=None, nullable=True )
+    cpe              = mapped_column( String, default=None, nullable=True )
+    created_date     = mapped_column( DateTime, default=datetime.datetime.utcnow )
+    last_updated     = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
+
+class PlatformAction( Versioned, Base ):
+    __tablename__ = 'platform_action'
+    id                 = mapped_column( Integer, primary_key=True )
+    name               = mapped_column( String, default=None, nullable=True )
+    input              = mapped_column( String, default=None, nullable=True )
+    created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
+    last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )

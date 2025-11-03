@@ -28,34 +28,46 @@ NAME = 'diamondback'
 OUR_CONFIGURATION_FILE = "configuration.ini"
 
 LOGGING_CONFIG = { 
-    'version': 1,
-    'disable_existing_loggers': True,
-    'formatters': { 
-        'standard': { 
-            'format': '%(asctime)s [%(levelname)s] %(name)s: %(message)s'
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "default": {
+            "format": "%(asctime)s - [%(module)s:%(levelname)s] [%(filename)s:%(lineno)d] - %(message)s"
         },
+        "root": {
+            "format": "ROOT - %(asctime)s - [%(module)s:%(levelname)s] [%(filename)s:%(lineno)d] - %(message)s"
+        }
     },
-    'handlers': { 
-        'default': { 
-            'level': 'INFO',
-            'formatter': 'standard',
-            'class': 'logging.StreamHandler',
-            'stream': 'ext://sys.stdout',  # Default is stderr
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "default"
         },
+        "root_console": {
+            "class": "logging.StreamHandler",
+            "formatter": "root"
+        },
+        "file":{
+            "formatter":"default",
+            "class":"logging.FileHandler",
+            "level":"INFO",
+            "filename":"diamondback.log"
+        }        
     },
-    'loggers': { 
-        '': {  # root logger
-            'handlers': ['default'],
-            'level': 'INFO',
-            'propagate': False
-        },
-        '__main__': {  # if __name__ == '__main__'
-            'handlers': ['default'],
-            'level': 'DEBUG',
-            'propagate': False
-        },
-    } 
+    "loggers": {
+        "app": {
+            "handlers": ["console"],
+            "level": "INFO",
+            # Don't send it up my namespace for additional handling
+            "propagate": False
+        }
+    },
+    "root": {
+        "handlers": ["root_console","file"],
+        "level": "INFO"
+    }
 }
+
 logging.config.dictConfig(LOGGING_CONFIG)
 
 CURRENT_DIRECTORY      = os.path.abspath( os.path.dirname(__file__) )
