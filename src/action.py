@@ -12,6 +12,8 @@ from ssh import SSHClientWrapped
 
 from domain import *
 
+from mac_vendor_lookup import MacLookup
+
 def set_variable_on_completion(variable_name, value):
     def decorator(func):
         def wrapper(*args, **kwargs):
