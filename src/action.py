@@ -198,8 +198,8 @@ class SSHConnectionAttempt( Action ):
 class SSHCommandExecution( Action ):
     def __init__( self, *args, **kwargs ):
         super().__init__( self, *args, **kwargs )
-        self.logger = logging.getLogger( 'commandexec' )
-        self.logger.info( 'initializing CmdExec action' )
+        self.logger = logging.getLogger( 'sshcommandexec' )
+        self.logger.info( 'initializing SSHCmdExec action' )
 
         i = self.get_input( )
         self.logger.info( f'using supplied target of {i}' )

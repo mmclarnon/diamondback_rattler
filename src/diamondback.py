@@ -154,6 +154,43 @@ def save_configuration( ctx ):
     logger.info( 'reload configuration from disk' )
     ctx.obj['CONFIGURATION'] = read_properties( ctx )  
 
+def is_base64(s: str) -> bool:
+    """
+    Checks if a string is Base64 encoded.
+
+    Args:
+        s: The string to check.
+
+    Returns:
+        True if the string is Base64 encoded, False otherwise.
+    """
+    try:
+        base64.b64decode(s, validate=True)
+        return True
+    except base64.binascii.Error:
+        return False
+    
+def read_password( ctx ):
+    """
+    attempt to read password from INI file and decrypt if possible. prevents
+    someone from having to supply a password on the command line and having
+    this be saved in shell history.
+    """
+    logger.info( 'read password from property file' )
+    if ctx.obj['CONFIGURATION'].has_option( "security", "password" ):
+        logger.info( 'found password' )
+        password = ctx.obj['CONFIGURATION'].get( 'security', 'password', fallback=None )
+        if password:
+            if is_base64( password ):
+                logger.info( 'decode password my dawg' )
+                decoded_pass        = base64.b64decode( password )
+                ctx.obj['PASSWORD'] = ctx.obj['BOX'].decrypt( decoded_pass ) 
+        else:
+            if not ctx.obj['PASSWORD']:
+                raise AttributeError( 'no password value found?' )
+    else:
+        logger.warning( 'did not find a password setting?' )
+
 @click.group()
 @click.option( '-c', '--configuration' )
 @click.option( '-q', '--quiet', is_flag=True )
@@ -215,6 +252,10 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
         save_configuration( ctx )
 
         logger.info( 'updated properties password as {}'.format(enc_pass) )
+    else:
+        logger.info( 'attempting to set password from properties' )
+        ctx.obj['PASSWORD'] = read_password(ctx)
+        logger.info( ctx.obj['PASSWORD'])     
 
     ctx.obj['STOP_EVENT'] = threading.Event( ) 
     ctx.obj['DIRECTORY']  = os.path.abspath( sys.executable )

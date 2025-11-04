@@ -18,6 +18,9 @@ second.
 ## Installation
 The very first thing I had to accomplish is the 
 
+## SSL Key
+    openssl req -x509 -newkey rsa:2048 -nodes -keyout private.key -out certificate.crt -days 365 -subj "/CN=ubuntu22srv"
+
 ## Virtual RAT
 A phrase that was used to describe pwncat to me was **virtual rat**. The 
 principal reason for performing this research was to determine if this is 

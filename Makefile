@@ -27,7 +27,7 @@ APPNAME = diamondback
 CONFIGURATION_FILE = configuration.json
 CONFIGURATION_SAMPLE = $(CONFIGURATION_FILE).sample
 SRCDIR = src
-
+REQUIRED_PACKAGES = python3-ansible-runner 
 # UNIX-based OS variables & settings
 RM = /bin/rm
 

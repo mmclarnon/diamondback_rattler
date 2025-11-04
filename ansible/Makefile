@@ -60,4 +60,7 @@ vault:
 	ansible-vault create --vault-id diamondback@prompt vault.yml
 
 pwncat:
-	ansible-playbook -i $(INVENTORY) --vault-password-file .vault_password --become-password-file .become_password install_pwncat.yml --extra-vars '{ "user":"sysadmin" }'
+	ansible-playbook -i $(INVENTORY) --vault-password-file .vault_password --become-password-file .become_password install_pwncat-cs.yml --extra-vars '{ "user":"sysadmin" }'
+
+pwncat-local:
+	ansible-playbook -i $(INVENTORY) --vault-password-file .vault_password --become-password-file .become_password install_pwncat-cs-local.yml --extra-vars '{ "user":"parallels" }'
