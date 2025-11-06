@@ -291,6 +291,7 @@ def basic(ctx, network, commands, port, skip_discovery, hosts):
     else:
         logger.info( 'using command-line supplied commands' )
 
+    d.set_mode( 'basic' )
     d.set_commands( commands )
 
     try:

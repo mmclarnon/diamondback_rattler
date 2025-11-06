@@ -2,6 +2,7 @@ import copy
 import logging
 import multiprocessing
 import os
+import sys
 import threading
 import time
 import traceback
@@ -19,11 +20,19 @@ from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Tab
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, Session
 from typing import List, Optional
 
+import pwncat
+from pwncat.manager import Manager 
+
+import numpy as np
+import sounddevice as sd
+from piper import PiperVoice
+
 from connection import *
 from action import *
 from support import *
 from domain import *
 from history_meta import versioned_session
+from piper.voice import PiperVoice
 
 class Client:
     def __init__( self, context=None, stop_event=None, hosts=None ):
@@ -74,7 +83,16 @@ class Client:
         print("Creating database schema...")
         Base.metadata.create_all(self.engine)
         
-        self.actions_log = []
+        self.actions_log    = []
+
+        self.pwncat_manager = Manager()
+
+        voicedir = self.configuration.get( 'piper', 'home' ) #Where onnx model files are stored on my machine
+        model = os.path.join( voicedir, self.configuration.get('piper','voice') )
+        self.speech_voice = PiperVoice.load(model)
+
+    def get_pwncat_manager( self ):
+        return self.pwncat_manager
 
     def get_username( self ):
         if self.context and self.context.obj:
@@ -91,7 +109,7 @@ class Client:
         print(hosts)
         self.hosts = hosts
     
-    def  get_hosts( self ):
+    def get_hosts( self ):
         return self.hosts
 
     def set_stop_event( self, event ):
@@ -104,13 +122,50 @@ class Client:
         return self.startup_time
 
 class Diamondback( Client ):
-    def __init__( self, context=None, stop_event=None, skip_discovery=False, hosts=None ):
+    def __init__( self, context=None, stop_event=None, mode='basic', skip_discovery=False, hosts=None ):
         super().__init__( context, stop_event=stop_event, hosts=hosts )
         self.logger = logging.getLogger( 'diamondback' )
 
+        self.set_mode( mode )
         self.skip_discovery = skip_discovery
 
+        # set the file name depending on the operating system
+        if sys.platform == 'win32':
+            file = os.environ.get('WINDIR', r'C:\WINDOWS') + r'\system32\drivers\etc\services'
+        else:
+            file = '/etc/services'
+
+        # Create an empty dictionary
+        self.network_services = dict()
+
+        # Iterate through the file, one line at a time
+        for line in open(file):
+
+            if line[0:1] != '#' and not line.isspace():
+                k = line.split(None, )[1]
+
+                # Extract the port number from port/protocol
+                v = line.split('/', )[0]
+                j = ''.join([i for i in v if not i.isdigit()])
+                l = j.strip('\t')
+                self.network_services[k] = l
+
         self.logger.info( 'initialized diamondback training agent...' )
+
+    def set_network_services( self, services ):
+        self.network_services = services
+
+    def get_service_for( self, port, protocol='tcp' ):
+        try:
+            return self.network_services[f'{port}/{protocol}']
+        except:
+            return None
+        
+    def set_mode( self, mode ):
+        self.mode = mode
+    
+    def get_mode( self ):
+        return self.mode
 
     def set_commands( self, commands ):
         self.commands = commands
@@ -142,6 +197,20 @@ class Diamondback( Client ):
         self.session.add( action_event )
 
         self.session.commit( )
+
+    def speak_text( self, text_to_read, configuration=None ):
+        audio_chunks = []
+
+        if text_to_read.find( '.' ) != -1:
+            text_to_read = text_to_read.replace( '.', ' dot ' )
+
+        for audio_chunk in self.speech_voice.synthesize(text_to_read):
+            # AudioChunk has .audio_int16_array property that returns numpy array
+            audio_chunks.append(audio_chunk.audio_int16_array)
+        
+        audio_data = np.concatenate(audio_chunks)
+        sd.play(audio_data, samplerate=self.speech_voice.config.sample_rate)
+        sd.wait()
 
     def run( self ):
         self.logger.info( 'starting agent' )
@@ -189,7 +258,6 @@ class Diamondback( Client ):
                     if not host_record:
                         self.logger.info( 'no past record of this host, save a new one' )
                         host_record = self.save_target( h )
-
                     self.logger.info( f'checking {host_record.address} for SSH' )
                     a = SSHConnectionAttempt(   self.action_results, 
                                                 target_address=h, 
@@ -203,9 +271,11 @@ class Diamondback( Client ):
                         self.logger.info( 'this host has ACTIVE ssh...' )
                         ssh_banner = a.banner
 
-                        ssh_service = TargetService( )
-                        ssh_service.victim = host_record
-                        ssh_service.banner = ssh_banner
+                        ssh_service          = TargetService( )
+                        ssh_service.name     = self.get_service_for( 22 )
+                        ssh_service.victim   = host_record
+                        ssh_service.protocol = 'tcp'
+                        ssh_service.banner   = ssh_banner
 
                         self.session.add( ssh_service )
 
@@ -214,18 +284,19 @@ class Diamondback( Client ):
                         self.logger.info( 'this host does not have active SSH' )
                 self.session.commit( )
                 valid_targets += valid_ssh_targets
-
                 self.logger.info( f"\n✓ Found {len(valid_ssh_targets)} active hosts SSH access:" )
-                for host in valid_ssh_targets:
-                    self.logger.info(f"  - {host}")
-                    a = SSHCommandExecution( self.action_results, 
-                                             target_address=host, 
-                                             username=self.get_username(), 
-                                             password=self.get_password(), 
-                                             commands=self.get_commands(),
-                                             session=self.session )
-                    a.run( )
-                    self.save_platform_action( a )
+
+                if self.get_mode( ) == 'basic':
+                    for host in valid_ssh_targets:
+                        self.logger.info(f"  - {host}")
+                        a = SSHCommandExecution( self.action_results, 
+                                                target_address=host, 
+                                                username=self.get_username(), 
+                                                password=self.get_password(), 
+                                                commands=self.get_commands(),
+                                                session=self.session )
+                        a.run( )
+                        self.save_platform_action( a )
             except KeyboardInterrupt:
                 self.logger.info( 'stop event sent, shutdown dawg' )
                 self.get_stop_event().set( )

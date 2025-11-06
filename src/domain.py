@@ -71,6 +71,7 @@ class TargetService( Versioned, Base ):
     name               = mapped_column( String, default=None, nullable=True )
     banner             = mapped_column( String, default=None, nullable=True )
     port               = mapped_column( Integer, default=0, nullable=True )
+    protocol           = mapped_column( String, default=None, nullable=True )
     cpe                = mapped_column( String, default=None, nullable=True )
     created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
     victim_id          = mapped_column(Integer, ForeignKey('target.id'), default=None, nullable = True)

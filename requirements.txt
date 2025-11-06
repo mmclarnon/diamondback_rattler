@@ -16,3 +16,7 @@ SQLAlchemy==2.0.44
 SQLAlchemy-Utils==0.42.0
 mac-vendor-lookup==0.1.12
 pwncat-cs==0.5.4
+pytest==8.4.2
+sounddevice==0.5.3
+soundfile==0.12.1 
+numpy<2

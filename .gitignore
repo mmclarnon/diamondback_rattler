@@ -9,7 +9,7 @@ __pycache__/
 *.toc
 
 **/*.iso
-
+**/data
 **/*.sqlite
 
 **/.prototype*

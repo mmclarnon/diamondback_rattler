@@ -27,7 +27,9 @@ APPNAME = diamondback
 CONFIGURATION_FILE = configuration.json
 CONFIGURATION_SAMPLE = $(CONFIGURATION_FILE).sample
 SRCDIR = src
-REQUIRED_PACKAGES = python3-ansible-runner 
+REQUIRED_PACKAGES = python3-ansible-runner \
+					libportaudio2 \
+					portaudio19-dev
 # UNIX-based OS variables & settings
 RM = /bin/rm
 
@@ -40,6 +42,7 @@ develop:
 	$(VENV) $(VIRTUAL_ENV)
 	@$(PIP) install -r requirements.txt
 	$(MAKE) -C ansible develop
+	mkdir data 2> /dev/null && cd data && python -m piper.download_voices en_US-amy-medium
 
 # Builds the app
 $(APPNAME): $(OBJ) 
@@ -53,6 +56,10 @@ $(APPNAME): $(OBJ)
 	@-$(RM) $(BINARY) 2> /dev/null
 	@-$(UPX) -9 -o$(BINARY) $(APPNAME)
 	@-$(RM) *.d
+
+.PHONY: test
+test:
+	@python -m unittest discover test/
 
 ################### Cleaning rules for Unix-based OS ###################
 # Cleans complete project
