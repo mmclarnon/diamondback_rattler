@@ -1,0 +1,10 @@
+# Load custom modules or set global parameters
+
+# Set global lhost value
+set --global lhost 10.10.10.1
+
+# Set the default database file location
+set --global db "file://pwncat.db"
+
+# Load a specific module class
+# load_module_class pwncat.modules.escalate.pwnkit

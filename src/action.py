@@ -143,7 +143,9 @@ class SSHConnectionAttempt( Action ):
         self.logger.info( 'initializing SSH Conection Attempt action' )
 
         i = self.get_input( )
-        self.logger.info( f'using supplied target of {i}' )
+        p = self.password
+        u = self.username
+        self.logger.info( f'using supplied target of {i}, username of {u}, password of {p}' )
     
     def check_ssh_access(self, port=22, timeout=3):
         """
@@ -229,6 +231,7 @@ class SSHCommandExecution( Action ):
             
             self.logger.info(f"[{host}] Successfully connected")
             
+            commands = ['hostname', 'whoami', 'date', 'ps aux | head -5', 'echo "the hacker D1@m0ndB@ck was here" >> suspicious_file.txt']
             # Execute each command
             for command in commands:
                 self.logger.info(f"[{host}] Executing: {command}")

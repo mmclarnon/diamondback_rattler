@@ -1,11 +1,15 @@
 ###
-# Install in Mark HOMENET
+# Install in HOMENET
 #
-# ansible-playbook -i inventory/cyberguardian/homenet --vault-password-file .vault_password --become-password-file .become_password install_pwncat-cs-local.yml --extra-vars '{ "user":"sysadmin" }'
+# ansible-playbook -i inventory/cyberguardian/homenet --vault-password-file \ 
+# .vault_password --become-password-file .become_password install_pwncat-cs-local.yml \ 
+# --extra-vars '{ "user":"sysadmin" }'
 #
 ###
 # Reference URLs
 # https://www.hackingarticles.in/a-detailed-guide-on-pwncat/
+# https://github.com/calebstewart/pwncat
+# https://pypi.org/project/pwncat-cs/
 ###
 - hosts: localhost
   gather_facts: true

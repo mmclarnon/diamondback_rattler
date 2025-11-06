@@ -73,7 +73,7 @@ logging.config.dictConfig(LOGGING_CONFIG)
 CURRENT_DIRECTORY      = os.path.abspath( os.path.dirname(__file__) )
 PARENT_DIRECTORY       = os.path.abspath( os.path.dirname(CURRENT_DIRECTORY) )
 VERSION_FILE           = "VERSION.txt"
-
+STOP_EVENT             = threading.Event( )
 logger                 = logging.getLogger( '{}'.format(NAME) )
 
 # Suppress paramiko warnings for demo purposes
@@ -242,7 +242,7 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
     if username:
         ctx.obj['USERNAME'] = username
     else:
-        ctx.obj['USERNAME'] = None
+        ctx.obj['USERNAME'] = ctx.obj['CONFIGURATION'].get('security','username')
         
     if password:
         logger.info( 'set password value' )
@@ -263,8 +263,7 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
 @diamondback_client.command(help="Simple helper to start operation for training")
 @click.option('--network', '-n', default='10.0.10.0/24', 
               help='Network range to scan (CIDR notation)')
-@click.option('--commands', '-c', multiple=True, 
-              default=['hostname', 'sudo shutdown -h now', 'whoami', 'date', 'ps aux | head -5', 'echo "the hacker D1@m0ndB@ck was here" >> suspicious_file.txt'],
+@click.option('--commands', '-c', multiple=True,
               help='Commands to execute on discovered hosts')
 @click.option('--port', default=22, 
               help='SSH port')
@@ -281,14 +280,17 @@ def basic(ctx, network, commands, port, skip_discovery, hosts):
     """
     if ctx.obj['CONFIGURATION']:
         logger.info( 'initialize diamondback instance with context' )
-        d = Diamondback( ctx )
+        d = Diamondback( ctx, skip_discovery=skip_discovery )
     else:
         logger.info( 'initialize diamondback with empty context' )
-        d = Diamondback()
+        d = Diamondback( None, skip_discovery=skip_discovery )
 
     if not commands:
-        commands = ctx.obj['CONFIGURATION'].get('execution','bash')
-    
+        logger.info( 'initialize commands from properties' )
+        commands = ctx.obj['CONFIGURATION'].get('execution','bash').split(",")
+    else:
+        logger.info( 'using command-line supplied commands' )
+
     d.set_commands( commands )
 
     try:
