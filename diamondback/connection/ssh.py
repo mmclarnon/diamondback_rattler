@@ -3,9 +3,12 @@ import logging
 import os
 import random
 import socket
+import time
+import traceback
 import paramiko
 
 from action import Action
+from domain import *
 from diamondback.connection import *
 
 class SSHClientWrapped:
@@ -200,6 +203,22 @@ class SSHConnectionAttempt( Action ):
         self.logger.info( 'starting ssh connection attempt action' )
         
         self.set_output( self.check_ssh_access() )
+        host_record = self.lookup_host_by_address( self.get_input() )
+
+        if self.get_output( ):
+            self.logger.info( 'this host has ACTIVE ssh...' )
+            ssh_banner = self.banner
+
+            ssh_service          = TargetService( )
+            ssh_service.name     = self.get_service_for( 22 )
+            ssh_service.victim   = host_record
+            ssh_service.protocol = 'tcp'
+            ssh_service.banner   = ssh_banner
+
+            self.session.add( ssh_service )
+            self.session.commit()
+        else:
+            self.logger.info( 'this host does not have active SSH' )
 
         self.logger.info( 'ssh connection attempt action completed....' )
         return self

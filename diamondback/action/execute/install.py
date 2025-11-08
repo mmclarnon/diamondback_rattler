@@ -2,7 +2,7 @@ import logging
 import multiprocessing
 
 from diamondback.domain import Command
-from diamondback.action import Action
+from diamondback.action import *
 from diamondback.connection.ssh import SSHClientWrapped
 
 class InstallPackage( Action ):
@@ -65,9 +65,11 @@ class InstallPackage( Action ):
         except Exception as e:
             self.logger.error(f"[{host}] Error: {str(e)}")
 
+    @call_before_decorator
     def run( self ):
         self.logger.info(f"\Installing package on host {self.get_input()}...")
         
         self.execute_commands_on_host( self.package )
 
         self.logger.info("\n✓ installation completed on target")
+        return self

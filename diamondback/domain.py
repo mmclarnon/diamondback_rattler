@@ -93,6 +93,7 @@ class PlatformAction( Versioned, Base ):
     id                 = mapped_column( Integer, primary_key=True )
     name               = mapped_column( String, default=None, nullable=True )
     input              = mapped_column( String, default=None, nullable=True )
+    location_id        = mapped_column(Integer, ForeignKey('location.id'), default=None, nullable = True)
     created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
     last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
 
@@ -105,7 +106,7 @@ class Credential( Versioned, Base ):
     created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
     last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
 
-class IPAddressInfo(Versioned, Base):
+class Location(Versioned, Base):
     """SQLAlchemy model for storing IP address information"""
     __tablename__ = 'location'
     
@@ -126,7 +127,7 @@ class IPAddressInfo(Versioned, Base):
     query_timestamp = mapped_column(DateTime, default=datetime.datetime.utcnow)
     
     def __repr__(self):
-        return f"<IPAddressInfo(ip='{self.ip}', city='{self.city}', country='{self.country}')>"
+        return f"<Location(ip='{self.ip}', city='{self.city}', country='{self.country}')>"
     
     def to_dict(self):
         """Convert the model instance to a dictionary"""

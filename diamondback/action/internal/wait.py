@@ -1,0 +1,19 @@
+import logging
+import time
+
+from diamondback.action import *
+
+class Sleep( Action ):
+    def __init__( self, *args, **kwargs ):
+        super().__init__( self, *args, **kwargs )
+        self.logger = logging.getLogger( 'sleep' )
+        self.logger.info( 'initializing sleep action' )
+
+    @call_before_decorator
+    def run( self ):
+        self.logger.info(f"wait for {self.get_input()} seconds")
+        
+        time.sleep( int(self.get_input()) )
+
+        self.logger.info("wait completed, moving on....\n")
+        return self

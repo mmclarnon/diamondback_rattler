@@ -33,6 +33,7 @@ from connection.ssh import *
 from action import *
 from action.scan.arp import ARPScan
 from action.scan.icmp import ICMPScan
+from action.internal.wait import Sleep
 from action.execute import SSHCommandExecution
 from support import *
 from domain import *
@@ -291,7 +292,7 @@ class Diamondback( Client ):
         
         return result
 
-    def store_ip_info(self, ip_data: Dict) -> IPAddressInfo:
+    def store_ip_info(self, ip_data: Dict) -> Location:
         """
         Store IP information in the database using an active SQLAlchemy session.
         
@@ -302,7 +303,7 @@ class Diamondback( Client ):
         Returns:
             IPAddressInfo instance that was stored
         """
-        ip_info = IPAddressInfo(
+        ip_info = Location(
             ip=ip_data.get('ip'),
             hostname=ip_data.get('hostname'),
             city=ip_data.get('city'),
@@ -360,15 +361,6 @@ class Diamondback( Client ):
         self.session.commit( )
         return new_target
     
-    def save_platform_action( self, action : Action ):
-        action_event       = PlatformAction( )
-        action_event.name  = action.__class__.__name__
-        action_event.input = action.get_input( )
-
-        self.session.add( action_event )
-
-        self.session.commit( )
-
     def speak_text( self, text_to_read, configuration=None ):
         audio_chunks = []
 
@@ -385,11 +377,11 @@ class Diamondback( Client ):
 
     def lookup_ip_details( self, current_ip ):
         self.logger.info( f'lookup location details by IP address: {current_ip}' )
-        return self.session.query( IPAddressInfo ).filter( IPAddressInfo.ip == current_ip ).first( )
+        return self.session.query( Location ).filter( Location.ip == current_ip ).first( )
 
     def run( self ):
         my_ip_info = self.query_public_ip_info()
-        my_location = None
+        my_location = NotImplementedError
         try:
             my_location = self.lookup_ip_details( my_ip_info['ip'] )
         except:
@@ -397,8 +389,7 @@ class Diamondback( Client ):
 
         if not my_location:
             self.logger.info( 'no record of this location, store one now please' )
-            self.store_ip_info( my_ip_info )
-            self.ipaddress_details = my_ip_info
+            self.ipaddress_details = self.store_ip_info( my_ip_info )
         else:
             self.logger.info( 'using previously stored record of this location' )
             self.ipaddress_details = my_location
@@ -406,13 +397,14 @@ class Diamondback( Client ):
         self.logger.info( 'starting agent, run initial discovery' )
         local_network = get_network_cidr_platform_specific()
         a = ARPScan(    self.action_results, 
+                        location = my_location,
                         target_address=local_network, 
-                        session=self.session )
-        a.run( )
+                        session=self.session ).run()
+
         self.logger.info( f'arp scan of {local_network} completed...' )
         hosts_found_via_arp = a.get_output()
         self.logger.info( f'found {len(hosts_found_via_arp)} hosts' )
-        self.save_platform_action( a )
+
         self.set_hosts( hosts_found_via_arp )
 
         if self.get_network():
@@ -420,13 +412,13 @@ class Diamondback( Client ):
             a = ICMPScan(   self.action_results, 
                             target_address=self.get_network(), 
                             timeout=10,
+                            location=self.ipaddress_details,
                             max_threads=50,
-                            session=self.session )
-            a.run( )
+                            session=self.session ).run( )
             self.logger.info( f'ICMP scan of {self.get_network()} completed...' )
             hosts_found_via_icmp = a.get_output()
             self.logger.info( f'found {len(hosts_found_via_icmp)} hosts via ICMP' )
-            self.save_platform_action( a )
+
             self.get_hosts().extend( hosts_found_via_icmp )
             self.logger.info( f'extended possible targets by {len(hosts_found_via_icmp)} more' )
 
@@ -445,9 +437,10 @@ class Diamondback( Client ):
 
                 if not self.skip_discovery:
                     self.logger.info( '(re)discover live hosts on LAN')
-                    a = ARPScan( self.action_results, target_address=get_network_cidr_platform_specific(), session=self.session )
-                    a.run( )
-                    self.save_platform_action( a )
+                    a = ARPScan(    self.action_results, 
+                                    target_address=get_network_cidr_platform_specific(), 
+                                    location=self.ipaddress_details,
+                                    session=self.session ).run( )
                     self.logger.info( 'arp scan completed...' )
                     self.logger.info( a.get_output() )
                     self.set_hosts( a.get_output() )            
@@ -464,26 +457,11 @@ class Diamondback( Client ):
                     a = SSHConnectionAttempt(   self.action_results, 
                                                 target_address=h, 
                                                 username=self.get_username(), 
+                                                location=self.ipaddress_details,
                                                 password=self.get_password(), 
-                                                session=self.session  )
-                    a.run( )
-                    self.save_platform_action( a )
+                                                session=self.session  ).run( )
                     self.logger.info( 'SSH connection attempt complete' )
-                    if a.get_output( ):
-                        self.logger.info( 'this host has ACTIVE ssh...' )
-                        ssh_banner = a.banner
 
-                        ssh_service          = TargetService( )
-                        ssh_service.name     = self.get_service_for( 22 )
-                        ssh_service.victim   = host_record
-                        ssh_service.protocol = 'tcp'
-                        ssh_service.banner   = ssh_banner
-
-                        self.session.add( ssh_service )
-
-                        valid_ssh_targets.append( h )
-                    else:
-                        self.logger.info( 'this host does not have active SSH' )
                 self.session.commit( )
                 valid_targets += valid_ssh_targets
                 self.logger.info( f"\n✓ Found {len(valid_ssh_targets)} active hosts SSH access:" )
@@ -496,9 +474,7 @@ class Diamondback( Client ):
                                                 username=self.get_username(), 
                                                 password=self.get_password(), 
                                                 commands=self.get_commands(),
-                                                session=self.session )
-                        a.run( )
-                        self.save_platform_action( a )
+                                                session=self.session ).run( )
             except KeyboardInterrupt:
                 self.logger.info( 'stop event sent, shutdown dawg' )
                 self.get_stop_event().set( )
@@ -506,4 +482,7 @@ class Diamondback( Client ):
                 self.logger.error( "FAILED execution!" )
                 tb = traceback.format_exc( )
                 self.logger.error( tb )
-            time.sleep( self.configuration.getint('execution','wait') )
+            Sleep(  self.action_results,
+                    input=10,
+                    location=my_location,
+                    session=self.session ).run( )

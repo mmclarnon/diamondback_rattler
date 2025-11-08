@@ -40,6 +40,8 @@ logging.config.fileConfig(OUR_CONFIGURATION_FILE)
 
 CURRENT_DIRECTORY      = os.path.abspath( os.path.dirname(__file__) )
 PARENT_DIRECTORY       = os.path.abspath( os.path.dirname(CURRENT_DIRECTORY) )
+DATA_DIRECTORY         = os.path.join( PARENT_DIRECTORY, "data")
+OPPLAN_DIRECTORY       = os.path.join( DATA_DIRECTORY, "operations")
 VERSION_FILE           = "VERSION.txt"
 STOP_EVENT             = threading.Event( )
 logger                 = logging.getLogger( '{}'.format(NAME) )
@@ -229,18 +231,17 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
     ctx.obj['DIRECTORY']  = os.path.abspath( sys.executable )
 
 @diamondback_client.command(help="Simple helper to start operation for training")
+@click.option( '-o', '--operation' )
 @click.option('--network', '-n', default='10.0.10.0/24', 
               help='Network range to scan (CIDR notation)')
 @click.option('--commands', '-c', multiple=True,
               help='Commands to execute on discovered hosts')
-@click.option('--port', default=22, 
-              help='SSH port')
 @click.option('--skip-discovery', is_flag=True,
               help='Skip network discovery and use provided hosts')
 @click.option('--hosts', multiple=True,
               help='Specific hosts to scan (if skip-discovery is set)')
 @click.pass_context
-def basic(ctx, network, commands, port, skip_discovery, hosts):
+def basic(ctx, operation, network, commands, skip_discovery, hosts):
     """
     basic functionality for the Diamondback Rattler malware. This should execute
     simple remote actions that a junior or entry-level analyst can spot with some 
@@ -252,6 +253,14 @@ def basic(ctx, network, commands, port, skip_discovery, hosts):
     else:
         logger.info( 'initialize diamondback with empty context' )
         d = Diamondback( None, skip_discovery=skip_discovery, hosts=hosts, network=network )
+
+    if not operation:
+        operation = "basic"
+
+    path_to_opplan = os.path.join( OPPLAN_DIRECTORY, f"{operation}.json" )
+    with open( path_to_opplan, "rb" ) as reader:
+        opplan  = json.load( reader )
+        logger.info( f"read operational plan {operation}" )
 
     if not commands:
         logger.info( 'initialize commands from properties' )

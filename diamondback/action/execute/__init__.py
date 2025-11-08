@@ -3,7 +3,7 @@ import multiprocessing
 import random
 import time
 
-from action import Action
+from diamondback.action import *
 from connection.ssh import SSHClientWrapped
 from domain import Command
 
@@ -71,6 +71,7 @@ class SSHCommandExecution( Action ):
         except Exception as e:
             self.logger.error(f"[{host}] Error: {str(e)}")
 
+    @call_before_decorator
     def run( self ):
         commands = self.commands
         # Step 3: Execute commands on SSH-accessible hosts using multiprocessing
@@ -93,3 +94,4 @@ class SSHCommandExecution( Action ):
             
             self.logger.info("\n✓ Command execution completed on all hosts")
 
+        return self

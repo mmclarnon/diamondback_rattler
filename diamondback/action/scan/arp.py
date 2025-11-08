@@ -2,7 +2,7 @@ import logging
 
 from scapy.all import *
 
-from action import Action
+from diamondback.action import *
 
 class ARPScan( Action ):
     def __init__( self, *args, **kwargs ):
@@ -44,8 +44,11 @@ class ARPScan( Action ):
 
         self.set_output( hosts )
         self.logger.info( self.get_output() )
-        
+    
+    @call_before_decorator
     def run( self ):
         self.logger.info( 'executing ARP Scan action to discover assets on target LAN' )
         self.discover_hosts_on_subnet( )
         self.logger.info( f'arp scan complete, found {len(self.get_output())} hosts' )
+
+        return self
