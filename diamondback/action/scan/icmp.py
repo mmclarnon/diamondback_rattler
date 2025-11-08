@@ -1,8 +1,10 @@
 import ipaddress
+import logging
 import sys
 from datetime import datetime
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
+from scapy.all import *
 
 from action import Action
 
@@ -17,9 +19,15 @@ class ICMPScan( Action ):
             max_threads: Maximum number of concurrent threads
         """
         super().__init__( *args, **kwargs )
+        self.logger = logging.getLogger( 'arpscan' )
+
         i = self.get_input( )
         self.network = ipaddress.ip_network(i, strict=False)
-        self.timeout = kwargs['timeout']
+        if 'timeout' in kwargs:
+            self.timeout = kwargs['timeout']
+        else:
+            self.timeout = 5
+
         self.max_threads = kwargs['max_threads']
         self.alive_hosts = []
         self.lock = threading.Lock()
@@ -35,12 +43,12 @@ class ICMPScan( Action ):
             tuple: (ip, True/False) indicating if host responded
         """
         try:
+            self.logger.debug( f"ping {ip}" )
             # Create ICMP packet
             packet = IP(dst=str(ip))/ICMP()
             
             # Send packet and wait for reply
             reply = sr1(packet, timeout=self.timeout, verbose=0)
-            
             if reply and reply.haslayer(ICMP):
                 # Check if it's an echo reply (type 0)
                 if reply[ICMP].type == 0:
@@ -50,7 +58,6 @@ class ICMPScan( Action ):
                     return (str(ip), False)
             else:
                 return (str(ip), False)
-                
         except Exception as e:
             return (str(ip), False)
     
@@ -61,10 +68,10 @@ class ICMPScan( Action ):
         Returns:
             list: List of IP addresses that responded to ping
         """
-        self.logger.info(f"\n[*] Starting ICMP scan on {self.network}")
+        self.logger.info(f"[*] Starting ICMP scan on {self.network}")
         self.logger.info(f"[*] Total hosts to scan: {self.network.num_addresses}")
         self.logger.info(f"[*] Timeout: {self.timeout}s per host")
-        self.logger.info(f"[*] Max threads: {self.max_threads}\n")
+        self.logger.info(f"[*] Max threads: {self.max_threads}")
         
         start_time = datetime.now()
         
@@ -94,13 +101,13 @@ class ICMPScan( Action ):
                     with self.lock:
                         self.alive_hosts.append(ip)
                     self.logger.info(f"[+] Host {ip} is alive")
-        
+        executor.shutdown(wait=True) # Blocks until all tasks are done
         elapsed_time = datetime.now() - start_time
         
         # self.logger.info summary
-        self.logger.info(f"\n[*] Scan completed in {elapsed_time}")
+        self.logger.info(f"[*] Scan completed in {elapsed_time}")
         self.logger.info(f"[*] Found {len(self.alive_hosts)} alive hosts out of {len(hosts)} scanned")
-        self.set_output( hosts )
+        self.set_output( self.alive_hosts )
         
         return sorted(self.alive_hosts, key=ipaddress.ip_address)
 

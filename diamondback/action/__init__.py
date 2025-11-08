@@ -1,18 +1,8 @@
-import logging
-import multiprocessing
 from multiprocessing import Process
-import random
 import time
-
-import paramiko
-from scapy.all import ARP, Ether, srp
-
 from support import *
-from ssh import SSHClientWrapped
 
 from domain import *
-
-from mac_vendor_lookup import MacLookup
 
 def set_variable_on_completion(variable_name, value):
     def decorator(func):
@@ -30,6 +20,14 @@ def set_variable_on_completion(variable_name, value):
     return decorator
 
 class Action:
+    """
+    The base class of all things done to a student machine or VM by the agent.
+    The principal purpose of the action is to allow me to encode things I want
+    the agent to do as JSON and then interpret them live in the agent. Anything
+    that you want to track across multiple actions (e.g. start time) should be 
+    defined in the base class here and use an accessor/mutator method to report
+    from a child.
+    """
     def __init__( self, *args, **kwargs ):
         super().__init__( )  # Call parent's __init__
         if 'input' in kwargs:
@@ -37,15 +35,15 @@ class Action:
         else:
             self.input = None
 
+        self.start_time = time.time() 
         self.variables =    {
                                 'name': 'action',
-                                'start': time.time(),
+                                'start': self.start_time,
                             }
-
-        self.start_time = time.time() 
 
         if 'username' in kwargs:
             self.username = kwargs['username']
+            self.variables['username'] = self.username
         else:
             self.username = None
 
@@ -56,16 +54,25 @@ class Action:
 
         if 'password' in kwargs:
             self.password = kwargs['password']
+            self.variables['password'] = kwargs['password']
         else:
             self.password = None
 
         if 'target_address' in kwargs:
             self.target_address = kwargs['target_address']
             self.set_input( self.target_address )
+            self.variables['target'] = self.target_address
         else:
             self.target_address = None
 
+        self.success = False
         self.output = None
+
+    def mark_successful( self ):
+        self.success = True
+
+    def was_successful( self ):
+        return self.success
 
     def add_variable( self, name, value ):
         self.variables['name'] = value
@@ -89,151 +96,4 @@ class Action:
     def get_commands_for( self, service ):
         self.logger.info( f'return all commands for {service}' )
         return self.session.query( Command ).filter( Command.service == service ).all( )
-
-class SSHConnectionAttempt( Action ):
-    def __init__( self, *args, **kwargs ):
-        super().__init__( self, *args, **kwargs )
-        self.logger = logging.getLogger( 'sshconnection' )
-        self.logger.info( 'initializing SSH Conection Attempt action' )
-
-        i = self.get_input( )
-        p = self.password
-        u = self.username
-        self.logger.info( f'using supplied target of {i}, username of {u}, password of {p}' )
-    
-    def check_ssh_access(self, port=22, timeout=3):
-        """
-        Check if SSH access is available with given credentials.
-        
-        Args:
-            host: IP address of the host
-            username: SSH username
-            password: SSH password
-            port: SSH port (default 22)
-            timeout: Connection timeout
-        
-        Returns:
-            True if SSH access successful, False otherwise
-        """
-        try:
-            # Create SSH client
-            client = paramiko.SSHClient()
-            client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-            
-            # Attempt connection
-            client.connect(
-                hostname=self.get_input( ),
-                port=port,
-                username=self.username,
-                password=self.password,
-                timeout=timeout,
-                allow_agent=False,
-                look_for_keys=False
-            )
-
-            transport = client.get_transport()
-            self.banner = transport.get_banner()
-
-            # Close connection
-            client.close()
-            return True
-        except (paramiko.AuthenticationException, 
-                paramiko.SSHException, 
-                socket.timeout, 
-                socket.error):
-            return False
-
-    def run( self ):
-        self.logger.info( 'starting ssh connection attempt action' )
-        
-        self.set_output( self.check_ssh_access() )
-
-        self.logger.info( 'ssh connection attempt action compelted....' )
-        return self
-
-class SSHCommandExecution( Action ):
-    def __init__( self, *args, **kwargs ):
-        super().__init__( self, *args, **kwargs )
-        self.logger = logging.getLogger( 'sshcommandexec' )
-        self.logger.info( 'initializing SSHCmdExec action' )
-
-        i = self.get_input( )
-        self.logger.info( f'using supplied target of {i}' )
-    
-        if 'commands' in kwargs:
-            self.commands = kwargs['commands']
-        else:
-            self.commands = [ 'whoami' ]
-
-    def execute_commands_on_host(self, commands, port=22):
-        """
-        Execute commands on a remote host via SSH.
-        
-        Args:
-            host: IP address of the host
-            username: SSH username
-            password: SSH password
-            commands: List of commands to execute
-            port: SSH port
-        """
-        self.logger.info(f"\n[Process {multiprocessing.current_process().pid}] "
-                f"Connecting to {self.get_input()}")
-        host = self.get_input()
-        try:
-            # Create SSH client
-            client = SSHClientWrapped( self.username, self.password, self.get_input(), port )
-            
-            self.logger.info(f"[{host}] Successfully connected")
-            
-            commands = ['hostname', 'whoami', 'date', 'ps aux | head -5', 'echo "the hacker D1@m0ndB@ck was here" >> suspicious_file.txt']
-            # Execute each command
-            for command in commands:
-                self.logger.info(f"[{host}] Executing: {command}")
-
-                c = self.lookup_command( command, 'ssh' )
-                if not c:
-                    new_command         = Command( )
-                    new_command.service = 'ssh'
-                    new_command.value   = command
-                    new_command.name    = command.split(" ")[0]
-
-                    self.session.add( new_command )
-                    self.session.commit( )
-
-                r = client.execute( command )
-                
-                if r['out']:
-                    self.logger.info(f"[{host}] Output:\n{r['out'][:200]}")  # Limit output length
-                if r['err']:
-                    self.logger.error(f"[{host}] Error: {r['err']}")
-                
-                time.sleep(random.randint(1,3))  # Small delay between commands
-            
-            # Close connection
-            client.close()
-            self.logger.info(f"[{host}] Connection closed")
-        except Exception as e:
-            self.logger.error(f"[{host}] Error: {str(e)}")
-
-    def run( self ):
-        commands = self.commands
-        # Step 3: Execute commands on SSH-accessible hosts using multiprocessing
-        if commands:
-            self.logger.info(f"\nExecuting commands on host {self.get_input()}...")
-            self.logger.info(f"Commands to execute: {list(commands)}\n")
-            
-            # Create a process for each host
-            processes = []
-            process = multiprocessing.Process(
-                target=self.execute_commands_on_host,
-                args=(list(commands), 22)
-            )
-            process.start()
-            processes.append(process)
-            
-            # Wait for all processes to complete
-            for process in processes:
-                process.join()
-            
-            self.logger.info("\n✓ Command execution completed on all hosts")
 

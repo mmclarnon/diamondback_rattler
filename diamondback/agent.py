@@ -1,4 +1,5 @@
 import copy
+import glob
 import logging
 import multiprocessing
 import os
@@ -28,20 +29,32 @@ import sounddevice as sd
 from piper import PiperVoice
 
 from connection import *
+from connection.ssh import *
 from action import *
 from action.scan.arp import ARPScan
 from action.scan.icmp import ICMPScan
+from action.execute import SSHCommandExecution
 from support import *
 from domain import *
 from history_meta import versioned_session
 from piper.voice import PiperVoice
 
+import requests
+import json
+from datetime import datetime
+from typing import Dict, Optional
+
+ALLOWED_DATA_FILES =    [
+                            'credential.json'
+                        ]
+DATA_DIRECTORY = os.path.join( os.path.abspath(os.path.dirname(os.path.dirname(__file__))), 'data' )
 class Client:
     def __init__( self, context=None, stop_event=None, hosts=None, network=None ):
         self.context            = context
         self.startup_time       = time.time( )
         self.cpu_info           = cpuinfo.get_cpu_info()
         self.available_memory   = int(psutil.virtual_memory()[0]/1024)/1024
+        self.logger = logging.getLogger( 'client' )
 
         if hosts:
             self.set_hosts( hosts.split(",") )
@@ -100,6 +113,21 @@ class Client:
         voicedir = self.configuration.get( 'piper', 'home' ) #Where onnx model files are stored on my machine
         model = os.path.join( voicedir, self.configuration.get('piper','voice') )
         self.speech_voice = PiperVoice.load(model)
+
+        self.load_data(  )
+
+    def load_data( self ):
+        self.logger.info( 'loading operational data' )
+        for f in glob.glob( os.path.join(DATA_DIRECTORY, "*.json") ):
+            if os.path.basename(f) in ALLOWED_DATA_FILES:
+                self.logger.info(f)
+                t = os.path.basename(f).split(".")[0]
+                f = os.path.join( DATA_DIRECTORY, f )
+                self.logger.info( f"examining {f}" )
+                with open( f, 'r' ) as reader:
+                    data = json.load(reader)
+                    if t.lower() == "credential":
+                        self.logger.info( "parsing credentials" )
 
     def set_targets( self, targets ):
         self.targets = targets
@@ -177,6 +205,124 @@ class Diamondback( Client ):
 
         self.logger.info( 'initialized diamondback training agent...' )
 
+    def query_public_ip_info(self, ip_address: Optional[str] = None, 
+                            timeout: int = 10,
+                            use_backup: bool = True) -> Dict:
+        """
+        Query public IP address information from online services.
+        
+        Args:
+            ip_address: Specific IP to query. If None, queries your own public IP.
+            timeout: Request timeout in seconds.
+            use_backup: If True, tries backup service if primary fails.
+        
+        Returns:
+            Dictionary containing IP information.
+        """
+        
+        # Primary service: ipapi.co (no API key required for basic usage)
+        primary_url = f"https://ipapi.co/{ip_address or ''}/json/"
+        
+        # Backup service: ipinfo.io (allows limited requests without API key)
+        backup_url = f"https://ipinfo.io/{ip_address or ''}/json"
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        try:
+            # Try primary service
+            response = requests.get(primary_url, headers=headers, timeout=timeout)
+            response.raise_for_status()
+            data = response.json()
+            
+            # Normalize data from ipapi.co
+            result = {
+                'ip': data.get('ip'),
+                'hostname': data.get('hostname'),
+                'city': data.get('city'),
+                'region': data.get('region'),
+                'country': data.get('country_name'),
+                'country_code': data.get('country_code'),
+                'postal_code': data.get('postal'),
+                'latitude': data.get('latitude'),
+                'longitude': data.get('longitude'),
+                'timezone': data.get('timezone'),
+                'org': data.get('org'),
+                'asn': data.get('asn'),
+                'service': 'ipapi.co',
+                'raw_response': data
+            }
+            
+        except (requests.RequestException, json.JSONDecodeError) as e:
+            if not use_backup:
+                raise Exception(f"Failed to query IP information: {str(e)}")
+            
+            try:
+                # Try backup service
+                response = requests.get(backup_url, headers=headers, timeout=timeout)
+                response.raise_for_status()
+                data = response.json()
+                
+                # Normalize data from ipinfo.io
+                loc = data.get('loc', ',').split(',')
+                lat = float(loc[0]) if len(loc) > 0 and loc[0] else None
+                lon = float(loc[1]) if len(loc) > 1 and loc[1] else None
+                
+                result = {
+                    'ip': data.get('ip'),
+                    'hostname': data.get('hostname'),
+                    'city': data.get('city'),
+                    'region': data.get('region'),
+                    'country': data.get('country'),
+                    'country_code': data.get('country'),
+                    'postal_code': data.get('postal'),
+                    'latitude': lat,
+                    'longitude': lon,
+                    'timezone': data.get('timezone'),
+                    'org': data.get('org'),
+                    'asn': None,  # ipinfo.io doesn't provide ASN in free tier
+                    'service': 'ipinfo.io',
+                    'raw_response': data
+                }
+                
+            except Exception as backup_error:
+                raise Exception(f"Both services failed. Primary: {str(e)}, Backup: {str(backup_error)}")
+        
+        return result
+
+    def store_ip_info(self, ip_data: Dict) -> IPAddressInfo:
+        """
+        Store IP information in the database using an active SQLAlchemy session.
+        
+        Args:
+            session: Active SQLAlchemy session
+            ip_data: Dictionary containing IP information
+        
+        Returns:
+            IPAddressInfo instance that was stored
+        """
+        ip_info = IPAddressInfo(
+            ip=ip_data.get('ip'),
+            hostname=ip_data.get('hostname'),
+            city=ip_data.get('city'),
+            region=ip_data.get('region'),
+            country=ip_data.get('country'),
+            country_code=ip_data.get('country_code'),
+            postal_code=ip_data.get('postal_code'),
+            latitude=ip_data.get('latitude'),
+            longitude=ip_data.get('longitude'),
+            timezone=ip_data.get('timezone'),
+            org=ip_data.get('org'),
+            asn=ip_data.get('asn'),
+            raw_data=ip_data.get('raw_response')
+        )
+        
+        self.session.add(ip_info)
+        self.session.commit()
+        
+        return ip_info
+
     def set_network_services( self, services ):
         self.network_services = services
 
@@ -237,7 +383,26 @@ class Diamondback( Client ):
         sd.play(audio_data, samplerate=self.speech_voice.config.sample_rate)
         sd.wait()
 
+    def lookup_ip_details( self, current_ip ):
+        self.logger.info( f'lookup location details by IP address: {current_ip}' )
+        return self.session.query( IPAddressInfo ).filter( IPAddressInfo.ip == current_ip ).first( )
+
     def run( self ):
+        my_ip_info = self.query_public_ip_info()
+        my_location = None
+        try:
+            my_location = self.lookup_ip_details( my_ip_info['ip'] )
+        except:
+            pass
+
+        if not my_location:
+            self.logger.info( 'no record of this location, store one now please' )
+            self.store_ip_info( my_ip_info )
+            self.ipaddress_details = my_ip_info
+        else:
+            self.logger.info( 'using previously stored record of this location' )
+            self.ipaddress_details = my_location
+
         self.logger.info( 'starting agent, run initial discovery' )
         local_network = get_network_cidr_platform_specific()
         a = ARPScan(    self.action_results, 
@@ -245,21 +410,25 @@ class Diamondback( Client ):
                         session=self.session )
         a.run( )
         self.logger.info( f'arp scan of {local_network} completed...' )
-        hosts_found = a.get_output()
-        self.logger.info( f'found {len(hosts_found)} hosts' )
+        hosts_found_via_arp = a.get_output()
+        self.logger.info( f'found {len(hosts_found_via_arp)} hosts' )
         self.save_platform_action( a )
+        self.set_hosts( hosts_found_via_arp )
 
         if self.get_network():
-            self.logger.info( f'user specified target subnet of {self.get_network()}' )
+            self.logger.info( f'user specified target subnet of {self.get_network()}, scan this for more potential targets' )
             a = ICMPScan(   self.action_results, 
                             target_address=self.get_network(), 
-                            timeout=3,
+                            timeout=10,
                             max_threads=50,
                             session=self.session )
+            a.run( )
             self.logger.info( f'ICMP scan of {self.get_network()} completed...' )
             hosts_found_via_icmp = a.get_output()
-            self.logger.info( f'found {len(hosts_found)} hosts via ICMP' )
+            self.logger.info( f'found {len(hosts_found_via_icmp)} hosts via ICMP' )
             self.save_platform_action( a )
+            self.get_hosts().extend( hosts_found_via_icmp )
+            self.logger.info( f'extended possible targets by {len(hosts_found_via_icmp)} more' )
 
         while not self.get_stop_event( ).is_set( ):
             valid_targets     = []

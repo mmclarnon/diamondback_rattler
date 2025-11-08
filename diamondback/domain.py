@@ -95,3 +95,54 @@ class PlatformAction( Versioned, Base ):
     input              = mapped_column( String, default=None, nullable=True )
     created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
     last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
+
+class Credential( Versioned, Base ):
+    __tablename__ = 'credential'
+    id                 = mapped_column( Integer, primary_key=True )
+    name               = mapped_column( String, default=None, nullable=True )
+    value              = mapped_column( String, default=None, nullable=True )
+    service            = mapped_column( String, default=None, nullable=True )
+    created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
+    last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
+
+class IPAddressInfo(Versioned, Base):
+    """SQLAlchemy model for storing IP address information"""
+    __tablename__ = 'location'
+    
+    id = mapped_column(Integer, primary_key=True, autoincrement=True)
+    ip = mapped_column(String(45), nullable=False, index=True)  # Supports IPv4 and IPv6
+    hostname = mapped_column(String(255))
+    city = mapped_column(String(100))
+    region = mapped_column(String(100))
+    country = mapped_column(String(100))
+    country_code = mapped_column(String(10))
+    postal_code = mapped_column(String(20))
+    latitude = mapped_column(Float)
+    longitude = mapped_column(Float)
+    timezone = mapped_column(String(100))
+    org = mapped_column(String(255))  # Organization/ISP
+    asn = mapped_column(String(50))  # Autonomous System Number
+    raw_data = mapped_column(JSON)  # Store complete response as JSON
+    query_timestamp = mapped_column(DateTime, default=datetime.datetime.utcnow)
+    
+    def __repr__(self):
+        return f"<IPAddressInfo(ip='{self.ip}', city='{self.city}', country='{self.country}')>"
+    
+    def to_dict(self):
+        """Convert the model instance to a dictionary"""
+        return {
+            'id': self.id,
+            'ip': self.ip,
+            'hostname': self.hostname,
+            'city': self.city,
+            'region': self.region,
+            'country': self.country,
+            'country_code': self.country_code,
+            'postal_code': self.postal_code,
+            'latitude': self.latitude,
+            'longitude': self.longitude,
+            'timezone': self.timezone,
+            'org': self.org,
+            'asn': self.asn,
+            'query_timestamp': self.query_timestamp.isoformat() if self.query_timestamp else None
+        }

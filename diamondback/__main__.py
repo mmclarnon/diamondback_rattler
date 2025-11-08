@@ -20,6 +20,13 @@ import sys
 
 import threading
 
+# Get the directory of the current script
+script_dir = os.path.dirname(os.path.abspath(__file__))
+
+# Add the parent directory (or any other relevant directory) to sys.path
+# For example, to add the directory containing the current script:
+sys.path.insert(0, os.path.dirname(script_dir)) 
+
 from agent import *
 from scapy.all import *
 
@@ -29,48 +36,7 @@ conf.verb = 0
 NAME = 'diamondback'
 OUR_CONFIGURATION_FILE = "configuration.ini"
 
-LOGGING_CONFIG = { 
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "default": {
-            "format": "%(asctime)s - [%(module)s:%(levelname)s] [%(filename)s:%(lineno)d] - %(message)s"
-        },
-        "root": {
-            "format": "ROOT - %(asctime)s - [%(module)s:%(levelname)s] [%(filename)s:%(lineno)d] - %(message)s"
-        }
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "default"
-        },
-        "root_console": {
-            "class": "logging.StreamHandler",
-            "formatter": "root"
-        },
-        "file":{
-            "formatter":"default",
-            "class":"logging.FileHandler",
-            "level":"INFO",
-            "filename":"diamondback.log"
-        }        
-    },
-    "loggers": {
-        "app": {
-            "handlers": ["console"],
-            "level": "INFO",
-            # Don't send it up my namespace for additional handling
-            "propagate": False
-        }
-    },
-    "root": {
-        "handlers": ["root_console","file"],
-        "level": "INFO"
-    }
-}
-
-logging.config.dictConfig(LOGGING_CONFIG)
+logging.config.fileConfig(OUR_CONFIGURATION_FILE)
 
 CURRENT_DIRECTORY      = os.path.abspath( os.path.dirname(__file__) )
 PARENT_DIRECTORY       = os.path.abspath( os.path.dirname(CURRENT_DIRECTORY) )

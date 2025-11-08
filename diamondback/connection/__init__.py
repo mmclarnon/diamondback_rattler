@@ -1,10 +1,8 @@
 from abc import ABC, abstractmethod
 from enum import Enum
 import logging
-import time
-import traceback
 
-import paramiko
+from diamondback import load_all_modules_pkgutil,load_all_modules_simple,setup_lazy_loading,ModuleLoader,_classes,_functions,_modules
 
 DEFAULT_CONNECTION_TIMEOUT = 3
 
@@ -14,6 +12,9 @@ class ConnectionState( Enum ):
     ERROR = 3
     CLOSED = 4
     UNKNOWN = 5
+
+# Configure logging
+logger = logging.getLogger(__name__)
 
 class Connection(ABC):
     """
@@ -81,4 +82,43 @@ class Connection(ABC):
     @abstractmethod
     def close(self):
         pass
+
+# Option 5: Conditional loading based on environment
+def initialize():
+    """
+    Initialize module loading based on environment variables.
+    """
+    import os
+    
+    load_strategy = os.getenv('MODULE_LOAD_STRATEGY', 'advanced')
+    
+    if load_strategy == 'simple':
+        load_all_modules_simple()
+    elif load_strategy == 'lazy':
+        setup_lazy_loading()
+    elif load_strategy == 'advanced':
+        loader = ModuleLoader(
+            recursive=True,
+            auto_register=True,
+            exclude_patterns=['test_*', '*_test.py', 'example_*']
+        )
+        results = loader.load_all()
+        
+        # Log results
+        if results['errors']:
+            logger.warning(f"Failed to load {len(results['errors'])} modules")
+        
+        logger.info(
+            f"Successfully loaded: "
+            f"{results['stats']['loaded_modules']} modules, "
+            f"{results['stats']['loaded_classes']} classes, "
+            f"{results['stats']['loaded_functions']} functions"
+        )
+    else:
+        load_all_modules_pkgutil()
+    
+    # Build __all__ for star imports
+    global __all__
+    __all__ = list(_classes.keys()) + list(_functions.keys())
+
 

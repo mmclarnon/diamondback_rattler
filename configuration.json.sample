@@ -1,12 +1,66 @@
 [general]
 dir = /usr/local/bin
+serial = 1114533950505869
 
 [security]
-encryption_key=ulfr.key
+encryption_key = diamondback.key
+username = sysadmin
+password = lla
+
+[database]
+type = sqlite
+url = diamondback.sqlite
 
 [api]
-status = /api/system/ping   
- 
+status = /api/system/ping
+
+[execution]
+bash = 'hostname', 'whoami', 'date', 'ps aux | head -5', 'echo "the hacker D1@m0ndB@ck was here" >> suspicious_file.txt'
+wait = 30
+
 [server]
-last=192.168.1.1
-username=sysadmin
+last = 192.168.1.1
+username = sysadmin
+
+[piper]
+home = ./data
+voice = en_US-amy-medium.onnx
+
+[loggers]
+keys = root,my_app
+
+[logger_root]
+level = DEBUG
+handlers = console
+
+[logger_my_app]
+level = DEBUG
+handlers = file_handler
+qualname = my_app
+propagate = 0
+
+[handlers]
+keys = console,file_handler
+
+[handler_console]
+class = StreamHandler
+level = INFO
+formatter = detailed_formatter
+args = (sys.stdout,)
+
+[handler_file_handler]
+class = handlers.RotatingFileHandler
+level = DEBUG
+formatter = detailed_formatter
+args = ('diamondback.log', 'a', 10485760, 5)
+
+[formatters]
+keys = simple_formatter,detailed_formatter
+
+[formatter_simple_formatter]
+format = %(levelname)s: %(message)s
+
+[formatter_detailed_formatter]
+format = %(asctime)s - [%(module)s:%(levelname)s] [%(filename)s:%(lineno)d] - %(message)s
+datefmt = %Y-%m-%d %H:%M:%S
+
