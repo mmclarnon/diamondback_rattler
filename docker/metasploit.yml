@@ -26,7 +26,6 @@ services:
               -a 0.0.0.0
               -f
               -n
-              -j
               -p 55553
               -S
     volumes:
