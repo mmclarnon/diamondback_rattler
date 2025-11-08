@@ -77,9 +77,6 @@ class InstallPackage( Action ):
 
                 self.logger.info( f'command to execute-->{command}')
 
-                if self.sudo:
-                    self.command = f"sudo {command}"
-
                 self.execute_command_via_ssh( )
             self.logger.info("installation completed on target")
         return self

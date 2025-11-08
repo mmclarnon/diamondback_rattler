@@ -21,12 +21,14 @@ services:
       - "5555:5555"     # example listener port
       - "6666:6666"
     command: >
-      /usr/src/metasploit-framework/msfrpcd
-      -U msf
-      -P msfpassword
-      -a 0.0.0.0
-      -p 55553
-      -f   # foreground mode
+      /usr/src/metasploit-framework/msfdb init --connection-string postgresql://msf:msfpassword@postgres:5432/msf &&
+      /usr/src/metasploit-framework/msfrpcd -U msf -P msf
+              -a 0.0.0.0
+              -f
+              -n
+              -j
+              -p 55553
+              -S
     volumes:
       - /home/sysadmin/workspace/diamondback_rattler/docker/data:/root/.msf4
       - /home/sysadmin/workspace/diamondback_rattler/docker/payloads:/payloads

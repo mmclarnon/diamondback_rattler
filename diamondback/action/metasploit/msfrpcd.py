@@ -7,6 +7,46 @@ import time
 from diamondback.action import call_before_decorator,Action
 from diamondback.support import add_inbound_accept_rule,ufw_allow_port,ufw_remove_port
 
+class MSFRPCClient:
+    def __init__(self, host="127.0.0.1", port=55553, username="msf", password="msfpassword"):
+        self.host = host
+        self.port = port
+        self.username = username
+        self.password = password
+        self.token = None
+        self.sock = None
+
+    def connect(self):
+        """Establish a TCP connection to msfrpcd."""
+        self.sock = socket.create_connection((self.host, self.port))
+
+    def send(self, method, params=[]):
+        """Send a MessagePack RPC request."""
+        if not self.sock:
+            raise RuntimeError("Not connected")
+        req = [method] + params
+        packed = msgpack.packb(req)
+        self.sock.sendall(packed)
+
+        # Receive response
+        data = self.sock.recv(4096)
+        return msgpack.unpackb(data, raw=False)
+
+    def login(self):
+        """Authenticate and store session token."""
+        resp = self.send("auth.login", [self.username, self.password])
+        if resp.get("result") == "success":
+            self.token = resp["token"]
+            print(f"Logged in successfully. Token: {self.token}")
+        else:
+            raise RuntimeError("Login failed")
+
+    def call(self, method, params=[]):
+        """Make an authenticated RPC call."""
+        if not self.token:
+            raise RuntimeError("Not authenticated")
+        return self.send(method, [self.token] + params)
+
 class MsfRPC(Action):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -20,7 +60,7 @@ class MsfRPC(Action):
 
         self.lport = kwargs.get("lport", 5555)
         self.container_name = kwargs.get("container", "metasploit")
-        self.host = kwargs.get("host", self.get_local_ip_address() )
+        self.host = kwargs.get("host", '127.0.0.1' )
         self.port = kwargs.get("port", 55553)
         self.user = kwargs.get("user", "msf")
         self.password = kwargs.get("password", "msfpassword")
@@ -46,29 +86,18 @@ class MsfRPC(Action):
         """Connect to msfrpcd and authenticate"""
         time.sleep( 20 )
         self.logger.info( f"connecting via RPC to {self.host} on port {self.port}" )
-        self.rpc_connection = socket.create_connection((self.host, self.port))
-        # Authenticate
-        auth_req = {
-            "method": "auth.login",
-            "id": 1,
-            "params": [self.user, self.password]
-        }
-        self.logger.info( auth_req )
-        self.rpc_connection.sendall(msgpack.packb(auth_req))
-        resp = msgpack.unpackb(self.rpc_connection.recv(4096), raw=False)
-        self.logger.info( resp )
-        if resp.get("result") == "success":
-            self.token = resp.get("token")
-            self.logger.info("Connected to msfrpcd, token acquired.")
-        else:
-            raise RuntimeError("Failed to authenticate to msfrpcd")
+        self.client = MSFRPCClient(host="127.0.0.1", port=55553, username="msf", password="msfpassword")
+        self.client.connect()
+        self.client.login()
 
     def launch_msfrpcd(self):
         """
         Launch the Metasploit msfrpcd daemon inside the running container.
         """
+        # docker run -it --rm -p 8443:55553   -e MSF_RPC_USER=msfuser   -e MSF_RPC_PASS=msfpassword   metasploitframework/metasploit-framework:latest   ./msfrpcd -U msfuser -P msfpassword -a 0.0.0.0 -f
+        
         cmd = [
-            "docker", "exec", self.container_name,
+            "docker", "run", "-it", self.container_name,
             "/usr/src/metasploit-framework/msfrpcd",
             "-U", self.user,
             "-P", self.password,
@@ -79,31 +108,19 @@ class MsfRPC(Action):
         ]
 
         try:
-            self.logger.info(f"Launching msfrpcd: {' '.join(cmd)}")
-            # Use Popen so the daemon stays running and you can interact with it
-            self.process = subprocess.Popen(cmd,
-                                    stdout=subprocess.PIPE,
-                                    stderr=subprocess.PIPE)
-            self.logger.info("msfrpcd daemon started successfully")
-
-            # Helper to stream logs
-            def stream_output(pipe, level="info"):
-                for line in iter(pipe.readline, ''):
-                    if line.strip():
-                        getattr(self.logger, level)(f"[msfrpcd] {line.strip()}")
-                pipe.close()
-
-            # Start threads to capture stdout and stderr
-            threading.Thread(target=stream_output, args=(self.process.stdout, "info"), daemon=True).start()
-            threading.Thread(target=stream_output, args=(self.process.stderr, "error"), daemon=True).start()
-
+            # self.logger.info(f"Launching msfrpcd: {' '.join(cmd)}")
+            # # Use Popen so the daemon stays running and you can interact with it
+            # self.process = subprocess.Popen(cmd,
+            #                         stdout=subprocess.PIPE,
+            #                         stderr=subprocess.PIPE)
+            # self.logger.info("msfrpcd daemon started successfully")
             return self.process
         except subprocess.CalledProcessError as e:
             self.logger.error(f"Error starting msfrpcd: {e}")
             return None
 
     def run( self ):
-        proc = self.launch_msfrpcd( )
+        #proc = self.launch_msfrpcd( )
 
         ufw_allow_port( self.port )
 
@@ -123,6 +140,6 @@ class MsfRPC(Action):
             "LPORT": lport
         }
 
-        resp = self._send("module.execute", [self.command, self.argument, opts])
+        resp = self.client.call("module.execute", [self.command, self.argument, opts])
         self.logger.info("Handler setup response:", resp)
 

@@ -482,7 +482,7 @@ class Diamondback( Client ):
                             "username": self.get_username(),
                             "password": self.get_password()
                         }
-
+            chosen_integer = random.randint( 2048, 3096 )
             registered_objects = {}
             self.special_values = {}
             for a in self.get_operation_plan()["actions"]:
@@ -520,6 +520,10 @@ class Diamondback( Client ):
                                                 self.logger.info( f'begin tracking special value {special_key} at {self.special_values[special_key]}' )
                                             else:
                                                 random_value = random.randint( base_value, base_value+len(targets)+25 )
+                                                while is_port_in_use( random_value ):
+                                                    self.logger.info( "if this a netowrk port its already in use, try 1 higher plz" )
+                                                    random_value += 1
+
                                                 self.special_values[special_key] = random_value
                                                 self.logger.info( f'update special value {special_key} to {self.special_values[special_key]}' )
                                             value = value.replace( substring,str(self.special_values[special_key]) )

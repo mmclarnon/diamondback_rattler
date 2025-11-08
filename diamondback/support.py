@@ -39,6 +39,39 @@ def delete_all_files(dir):
             except Exception as e:
                 logger.warning(f"Error deleting {file_path}: {e}")
 
+def get_local_ip_address( ):
+    """
+    Retrieves the local network IP address of the current machine.
+    """
+    try:
+        # Create a socket object
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        # Connect to an external address (doesn't send data, just establishes a connection
+        # to get the local IP used for outbound connections)
+        s.connect(("8.8.8.8", 80))  # Google's public DNS server
+        local_ip = s.getsockname()[0]
+        s.close()
+        return local_ip
+    except socket.error as e:
+        return None
+        
+def is_port_in_use(port: int) -> bool:
+    """
+    Check if a given port is in use on the specified host.
+
+    Args:
+        host (str): The hostname or IP address (e.g., '127.0.0.1' or 'localhost').
+        port (int): The port number to check.
+
+    Returns:
+        bool: True if the port is in use, False otherwise.
+    """
+    host = get_local_ip_address( )
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(1)  # short timeout
+        result = sock.connect_ex((host, port))
+        return result == 0
+
 def ufw_allow_port(port: int, protocol: str = "tcp"):
     """
     Allow inbound connections on a specific port using UFW.

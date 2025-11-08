@@ -5,9 +5,13 @@ import shlex
 import time
 import traceback
 import select
+import socket
 import os
 
 from diamondback.connection import Connection,ConnectionState
+
+
+
 
 class SocatReverseShellConnection( Connection ):
     def __init__( self, target_address, username, password, port=4444 ):
@@ -15,7 +19,6 @@ class SocatReverseShellConnection( Connection ):
         self.logger = logging.getLogger( 'socatrevshellconnection' )
 
         self.set_connection_type( "socat_reverse" )
-
         self.set_port( port )
 
         self.logger.info( 'opening reverse shell connection to target' )

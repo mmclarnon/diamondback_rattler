@@ -43,7 +43,7 @@ class AddUser( Action ):
                 password = self.new_password
 
             cmd = [
-                'useradd',
+                '/usr/sbin/useradd',
                 '-m',  # Create home directory
                 '-s', '/bin/bash',  # Set bash as default shell
                 '-G', 'sudo,adm',  # Add to sudo and adm groups
