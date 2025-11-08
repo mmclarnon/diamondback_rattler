@@ -441,9 +441,7 @@ class Diamondback( Client ):
                                     target_address=get_network_cidr_platform_specific(), 
                                     location=self.ipaddress_details,
                                     session=self.session ).run( )
-                    self.logger.info( 'arp scan completed...' )
-                    self.logger.info( a.get_output() )
-                    self.set_hosts( a.get_output() )            
+                    self.logger.info( f'arp scan completed found {len(a.get_output())} hosts...' )
                 else:
                     self.logger.info( 'skipping host discovery this iteration' )
 
