@@ -14,3 +14,8 @@ support Python greater than 3.11.
 
 * https://www.youtube.com/watch?v=Lwv4aSyCEZY
 * https://github.com/OlivierProTips/HackNotes/blob/master/pwncat-cs.md
+
+
+# Shell Generators:
+
+https://erev0s.com/blog/encrypted-bind-and-reverse-shells-socat/

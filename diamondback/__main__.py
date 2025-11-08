@@ -12,17 +12,19 @@ import nacl
 from nacl import secret
 import os
 import click
-import multiprocessing
 from logging.config import dictConfig
 import logging
 
 import warnings
 import sys
-import time
 
 import threading
 
 from agent import *
+from scapy.all import *
+
+# Suppress Scapy warnings
+conf.verb = 0
 
 NAME = 'diamondback'
 OUR_CONFIGURATION_FILE = "configuration.ini"
@@ -280,10 +282,10 @@ def basic(ctx, network, commands, port, skip_discovery, hosts):
     """
     if ctx.obj['CONFIGURATION']:
         logger.info( 'initialize diamondback instance with context' )
-        d = Diamondback( ctx, skip_discovery=skip_discovery )
+        d = Diamondback( ctx, skip_discovery=skip_discovery, hosts=hosts, network=network )
     else:
         logger.info( 'initialize diamondback with empty context' )
-        d = Diamondback( None, skip_discovery=skip_discovery )
+        d = Diamondback( None, skip_discovery=skip_discovery, hosts=hosts, network=network )
 
     if not commands:
         logger.info( 'initialize commands from properties' )

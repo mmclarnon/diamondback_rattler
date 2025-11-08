@@ -1,86 +1,53 @@
-from abc import ABC, abstractmethod
-from enum import Enum
 import logging
-import time
-import traceback
 
 import paramiko
 
-DEFAULT_CONNECTION_TIMEOUT = 3
+from diamondback.connection import *
 
-class ConnectionState( Enum ):
-    CONNECTED = 1
-    NOT_CONNECTED = 2
-    ERROR = 3
-    CLOSED = 4
-    UNKNOWN = 5
+class SSHClientWrapped:
+    "A wrapper of paramiko.SSHClient"
+    TIMEOUT = 4
 
-class Connection(ABC):
-    """
-    the base class for all diamonback connection(s). this is designed for the 
-    principal purpose of easing development of new features for training 
-    purposes. 
-    """
-    def __init__( self, target_address, username=None, password=None, port=0 ):
-        self.set_target( target_address )
-        self.set_username( username )
-        self.set_password( password )
-        self.set_port( port )
-        self.set_client( None )
-        self.timestamp = 0
-        self.connection_state = ConnectionState.UNKNOWN
-
-        self.errors = []
-
-    def get_errors( self ):
-        return self.errors
-
-    def is_connected( self ):
-        return self.connection_state == ConnectionState.CONNECTED
-
-    def set_connection_type( self, connection_type ):
-        self.connection_type = connection_type
-    
-    def get_connection_type( self ):
-        return self.connection_type
-    
-    def set_client( self, connection_client ):
-        self.client = connection_client
-
-    def get_client( self ):
-        return self.client
-
-    def set_target( self, target ):
-        self.target = target
-
-    def get_target( self ):
-        return self.target
-
-    def set_username( self, username ):
+    def __init__(   self, 
+                    username   = None, 
+                    password   = None, 
+                    host       = None, 
+                    port       = None, 
+                    key        = None, 
+                    passphrase = None, 
+                    client     = None,
+                    timeout    = 0 ):
         self.username = username
-    
-    def set_password( self, password ):
         self.password = password
+        if client is None:
+            self.client = paramiko.SSHClient()
+            self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            if key is not None:
+                key = paramiko.RSAKey.from_private_key(StringIO(key), password=passphrase)
+            if timeout != 0:
+                self.client.connect( host, port, username=username, password=password, pkey=key, timeout=timeout )
+            else:
+                self.client.connect( host, port, username=username, password=password, pkey=key )
+        else:
+            self.client = client
 
-    def get_username( self ):
-        return self.username
+    def close( self ):
+        if self.client is not None:
+            self.client.close()
+            self.client = None
 
-    def get_password( self ):
-        return self.password
-
-    def set_port( self, port ):
-        self.port = port
-
-    def get_port( self ):
-        return self.port
-
-    @abstractmethod
-    def open(self):
-        pass
-
-    @abstractmethod
-    def close(self):
-        pass
+    def execute( self, command, sudo=False ):
+        feed_password = False
+        if sudo and self.username != "root":
+            command = "sudo -S -p '' %s" % command
+            feed_password = self.password is not None and len(self.password) > 0
+        stdin, stdout, stderr = self.client.exec_command(command)
+        if feed_password:
+            stdin.write(self.password + "\n")
+            stdin.flush()
+        return {'out': stdout.read(),
+                'err': stderr.read(),
+                'retval': stdout.channel.recv_exit_status()}
 
 class SSHConnection( Connection ):
     def __init__( self, target_address, username, password ):

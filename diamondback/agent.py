@@ -29,22 +29,32 @@ from piper import PiperVoice
 
 from connection import *
 from action import *
+from action.scan.arp import ARPScan
+from action.scan.icmp import ICMPScan
 from support import *
 from domain import *
 from history_meta import versioned_session
 from piper.voice import PiperVoice
 
 class Client:
-    def __init__( self, context=None, stop_event=None, hosts=None ):
+    def __init__( self, context=None, stop_event=None, hosts=None, network=None ):
         self.context            = context
         self.startup_time       = time.time( )
         self.cpu_info           = cpuinfo.get_cpu_info()
         self.available_memory   = int(psutil.virtual_memory()[0]/1024)/1024
 
         if hosts:
-            self.set_hosts( hosts )
+            self.set_hosts( hosts.split(",") )
         else:
             self.set_hosts( [] )
+
+        self.targets = {}
+
+        if network:
+            logging.info( f'set network address to {network}' )
+            self.set_network( network )
+        else:
+            self.set_network( None )
 
         self.path_to_configuration    = os.path.join( PARENT_DIRECTORY, DEFAULT_CONFIGURATION_FILE )
 
@@ -91,6 +101,21 @@ class Client:
         model = os.path.join( voicedir, self.configuration.get('piper','voice') )
         self.speech_voice = PiperVoice.load(model)
 
+    def set_targets( self, targets ):
+        self.targets = targets
+
+    def get_targets( self ):
+        return self.targets
+    
+    def add_target( self, key, target_object ):
+        self.get_targets()[key] = target_object
+
+    def set_network( self, network ):
+        self.network = network
+
+    def get_network( self ):
+        return self.network
+
     def get_pwncat_manager( self ):
         return self.pwncat_manager
 
@@ -122,8 +147,8 @@ class Client:
         return self.startup_time
 
 class Diamondback( Client ):
-    def __init__( self, context=None, stop_event=None, mode='basic', skip_discovery=False, hosts=None ):
-        super().__init__( context, stop_event=stop_event, hosts=hosts )
+    def __init__( self, context=None, stop_event=None, mode='basic', skip_discovery=False, hosts=None, network=None ):
+        super().__init__( context, stop_event=stop_event, hosts=hosts, network=network )
         self.logger = logging.getLogger( 'diamondback' )
 
         self.set_mode( mode )
@@ -213,20 +238,28 @@ class Diamondback( Client ):
         sd.wait()
 
     def run( self ):
-        self.logger.info( 'starting agent' )
+        self.logger.info( 'starting agent, run initial discovery' )
+        local_network = get_network_cidr_platform_specific()
+        a = ARPScan(    self.action_results, 
+                        target_address=local_network, 
+                        session=self.session )
+        a.run( )
+        self.logger.info( f'arp scan of {local_network} completed...' )
+        hosts_found = a.get_output()
+        self.logger.info( f'found {len(hosts_found)} hosts' )
+        self.save_platform_action( a )
 
-        if not self.skip_discovery:
-            self.logger.info( 'stating initial discovery' )
-            a = ARPScan(    self.action_results, 
-                            target_address=get_network_cidr_platform_specific(), 
+        if self.get_network():
+            self.logger.info( f'user specified target subnet of {self.get_network()}' )
+            a = ICMPScan(   self.action_results, 
+                            target_address=self.get_network(), 
+                            timeout=3,
+                            max_threads=50,
                             session=self.session )
-            a.run( )
-            self.logger.info( 'arp scan completed...' )
-            self.logger.info( a.get_output() )
-            self.set_hosts( a.get_output() )
+            self.logger.info( f'ICMP scan of {self.get_network()} completed...' )
+            hosts_found_via_icmp = a.get_output()
+            self.logger.info( f'found {len(hosts_found)} hosts via ICMP' )
             self.save_platform_action( a )
-        else:
-            self.logger.info( f'explicitly setting hosts to {self.get_hosts()}' )
 
         while not self.get_stop_event( ).is_set( ):
             valid_targets     = []

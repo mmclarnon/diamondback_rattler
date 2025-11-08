@@ -1,0 +1,106 @@
+import ipaddress
+import sys
+from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, as_completed
+import threading
+
+from action import Action
+
+class ICMPScan( Action ):
+    def __init__( self, *args, **kwargs ):
+        """
+        Initialize ICMP scanner
+        
+        Args:
+            cidr: Network in CIDR notation (e.g., "192.168.1.0/24")
+            timeout: Timeout for each ping in seconds
+            max_threads: Maximum number of concurrent threads
+        """
+        super().__init__( *args, **kwargs )
+        i = self.get_input( )
+        self.network = ipaddress.ip_network(i, strict=False)
+        self.timeout = kwargs['timeout']
+        self.max_threads = kwargs['max_threads']
+        self.alive_hosts = []
+        self.lock = threading.Lock()
+        
+    def ping_host(self, ip):
+        """
+        Send ICMP echo request to a single host
+        
+        Args:
+            ip: IP address to ping
+            
+        Returns:
+            tuple: (ip, True/False) indicating if host responded
+        """
+        try:
+            # Create ICMP packet
+            packet = IP(dst=str(ip))/ICMP()
+            
+            # Send packet and wait for reply
+            reply = sr1(packet, timeout=self.timeout, verbose=0)
+            
+            if reply and reply.haslayer(ICMP):
+                # Check if it's an echo reply (type 0)
+                if reply[ICMP].type == 0:
+                    return (str(ip), True)
+                # Host exists but returned different ICMP type (e.g., destination unreachable)
+                else:
+                    return (str(ip), False)
+            else:
+                return (str(ip), False)
+                
+        except Exception as e:
+            return (str(ip), False)
+    
+    def run( self ):
+        """
+        Scan entire network for alive hosts
+        
+        Returns:
+            list: List of IP addresses that responded to ping
+        """
+        self.logger.info(f"\n[*] Starting ICMP scan on {self.network}")
+        self.logger.info(f"[*] Total hosts to scan: {self.network.num_addresses}")
+        self.logger.info(f"[*] Timeout: {self.timeout}s per host")
+        self.logger.info(f"[*] Max threads: {self.max_threads}\n")
+        
+        start_time = datetime.now()
+        
+        # Get all host IPs (excluding network and broadcast for IPv4)
+        if self.network.version == 4:
+            # For /32 and /31, include all addresses
+            if self.network.prefixlen >= 31:
+                hosts = list(self.network.hosts()) or [self.network.network_address]
+            else:
+                hosts = list(self.network.hosts())
+        else:
+            # IPv6
+            hosts = list(self.network.hosts())
+        
+        if not hosts:
+            hosts = [self.network.network_address]
+        
+        # Use ThreadPoolExecutor for concurrent scanning
+        with ThreadPoolExecutor(max_workers=self.max_threads) as executor:
+            # Submit all ping tasks
+            futures = {executor.submit(self.ping_host, ip): ip for ip in hosts}
+            
+            # Process results as they complete
+            for future in as_completed(futures):
+                ip, is_alive = future.result()
+                if is_alive:
+                    with self.lock:
+                        self.alive_hosts.append(ip)
+                    self.logger.info(f"[+] Host {ip} is alive")
+        
+        elapsed_time = datetime.now() - start_time
+        
+        # self.logger.info summary
+        self.logger.info(f"\n[*] Scan completed in {elapsed_time}")
+        self.logger.info(f"[*] Found {len(self.alive_hosts)} alive hosts out of {len(hosts)} scanned")
+        self.set_output( hosts )
+        
+        return sorted(self.alive_hosts, key=ipaddress.ip_address)
+
