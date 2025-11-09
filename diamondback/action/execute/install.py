@@ -2,7 +2,7 @@ import logging
 import multiprocessing
 
 from diamondback.domain import Command
-from diamondback.action import *
+from diamondback.action import call_before_decorator,Action
 from diamondback.connection.ssh import SSHClientWrapped
 
 class InstallPackage( Action ):
@@ -14,10 +14,15 @@ class InstallPackage( Action ):
         i = self.get_input( )
         self.logger.info( f'using supplied target of {i}' )
     
+        if "sudo" in kwargs:
+            self.sudo = kwargs["sudo"]
+        else:
+            self.sudo = False
+
         if 'commands' in kwargs:
             self.command = kwargs['commands']
         else:
-            self.command = [ 'sudo apt install -y' ]
+            self.command = [ 'sudo apt install -y {package}' ]
 
         if 'package' in kwargs:
             self.package = kwargs['package']

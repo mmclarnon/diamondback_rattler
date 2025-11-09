@@ -6,7 +6,7 @@ import logging
 logger = logging.getLogger( __name__ )
 
 from sqlalchemy import create_engine,inspect,Enum
-from sqlalchemy import String, Text, PickleType, Float, Integer, Boolean, ForeignKey, DateTime, JSON, BigInteger
+from sqlalchemy import Column, String, Text, PickleType, Float, Integer, Boolean, ForeignKey, DateTime, JSON, BigInteger
 from sqlalchemy_utils import IPAddressType
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import mapped_column
@@ -63,19 +63,42 @@ class Target( Versioned, Base ):
     data             = mapped_column( JSON, nullable=True )
     created_date     = mapped_column( DateTime, default=datetime.datetime.utcnow )
     last_updated     = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
-    services         = relationship("TargetService", back_populates="victim")
+
+    # One-to-Many relationship with TargetService
+    # This creates a list of TargetService objects accessible via target.services
+    services = relationship(
+        "TargetService",
+        back_populates="target",  # Bidirectional relationship
+        cascade="all, delete-orphan",  # Cascade deletes
+        lazy="dynamic",  # Load services dynamically (useful for large collections)
+        order_by="TargetService.port"  # Order services by port
+    )
 
 class TargetService( Versioned, Base ):
     __tablename__ = 'target_service'
     id                 = mapped_column( Integer, primary_key=True )
+
+    # Foreign key to Target (Many-to-One relationship)
+    target_id = Column(
+        Integer, 
+        ForeignKey('target.id', ondelete='CASCADE'),  # Delete services when target is deleted
+        nullable=False,
+        index=True  # Index for faster joins
+    )
+
     name               = mapped_column( String, default=None, nullable=True )
     banner             = mapped_column( String, default=None, nullable=True )
     port               = mapped_column( Integer, default=0, nullable=True )
     protocol           = mapped_column( String, default=None, nullable=True )
     cpe                = mapped_column( String, default=None, nullable=True )
     created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
-    victim_id          = mapped_column(Integer, ForeignKey('target.id'), default=None, nullable = True)
-    victim             = relationship("Target", back_populates="services")
+    # Many-to-One relationship with Target
+    # This creates a Target object accessible via service.target
+    target = relationship(
+        "Target",
+        back_populates="services",  # Bidirectional relationship
+        lazy="joined"  # Eagerly load target when loading service
+    )
     last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
 
 class Command( Versioned, Base ):

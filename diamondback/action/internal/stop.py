@@ -1,6 +1,6 @@
 import logging
 
-from diamondback.action import *
+from diamondback.action import call_before_decorator,Action
 
 class Stop( Action ):
     def __init__( self, *args, **kwargs ):
@@ -9,7 +9,7 @@ class Stop( Action ):
         self.logger.info( 'initializing stop action' )
 
         if 'stop_event' in kwargs:
-            self.stop_event = kwargs['stop_events']
+            self.stop_event = kwargs['stop_event']
 
     @call_before_decorator
     def run( self ):

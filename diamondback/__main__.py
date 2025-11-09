@@ -261,15 +261,7 @@ def basic(ctx, operation, network, commands, skip_discovery, hosts):
     with open( path_to_opplan, "rb" ) as reader:
         opplan  = json.load( reader )
         logger.info( f"read operational plan {operation}" )
-
-    if not commands:
-        logger.info( 'initialize commands from properties' )
-        commands = ctx.obj['CONFIGURATION'].get('execution','bash').split(",")
-    else:
-        logger.info( 'using command-line supplied commands' )
-
-    d.set_mode( 'basic' )
-    d.set_commands( commands )
+        d.set_operation_plan( opplan )
 
     try:
         d.run( )

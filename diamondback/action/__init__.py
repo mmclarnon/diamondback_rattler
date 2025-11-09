@@ -1,9 +1,16 @@
 import logging
 from multiprocessing import Process
+import sys
 import time
-from support import *
 
+import numpy as np
+import sounddevice as sd
+from piper import PiperVoice
+from piper.voice import PiperVoice
+from support import *
 from domain import *
+
+__all__ = ['Action', 'factory']
 
 def set_variable_on_completion(variable_name, value):
     def decorator(func):
@@ -27,10 +34,10 @@ def call_before_decorator(func):
     """
     def wrapper(self, *args, **kwargs):
         # The 'self' argument gives access to the class instance and its methods
-        logging.info(f"--- ACTION: Calling method automatically before '{func.__name__}' ---")
+        logging.debug(f"--- ACTION: Calling method automatically before '{func.__name__}' ---")
         self.save_platform_action()  # Call the "before" method
         result = func(self, *args, **kwargs) # Call the original method
-        logging.info(f"--- Decorator: '{func.__name__}' finished ---")
+        logging.debug(f"--- Decorator: '{func.__name__}' finished ---")
         return result
     return wrapper
 
@@ -55,6 +62,11 @@ class Action:
                                 'name': 'action',
                                 'start': self.start_time,
                             }
+        if "configuration" in kwargs:
+            self.configuration = kwargs["configuration"]
+
+        if "context" in kwargs:
+            self.context = kwargs["context"]
 
         if "location" in kwargs:
             self.location = kwargs["location"]
@@ -77,14 +89,68 @@ class Action:
             self.password = None
 
         if 'target_address' in kwargs:
-            self.target_address = kwargs['target_address']
-            self.set_input( self.target_address )
-            self.variables['target'] = self.target_address
+            if 'input' not in kwargs:
+                self.target_address = kwargs['target_address']
+                self.set_input( self.target_address )
+                self.variables['target'] = self.target_address
+            else:
+                self.set_input( kwargs['input'] )
         else:
             self.target_address = None
 
         self.success = False
         self.output = None
+
+        voicedir = self.configuration.get( 'piper', 'home' ) #Where onnx model files are stored on my machine
+        model = os.path.join( voicedir, self.configuration.get('piper','voice') )
+        self.speech_voice = PiperVoice.load(model)
+
+        # set the file name depending on the operating system
+        if sys.platform == 'win32':
+            file = os.environ.get('WINDIR', r'C:\WINDOWS') + r'\system32\drivers\etc\services'
+        else:
+            file = '/etc/services'
+
+        # Create an empty dictionary
+        self.network_services = dict()
+
+        # Iterate through the file, one line at a time
+        for line in open(file):
+
+            if line[0:1] != '#' and not line.isspace():
+                k = line.split(None, )[1]
+
+                # Extract the port number from port/protocol
+                v = line.split('/', )[0]
+                j = ''.join([i for i in v if not i.isdigit()])
+                l = j.strip('\t')
+                self.network_services[k] = l
+
+    def speak_text( self, text_to_read, configuration=None ):
+        audio_chunks = []
+        if not configuration:
+            configuration = self.configuration
+
+        if configuration.getboolean('execution','speak'):
+            if text_to_read.find( '.' ) != -1:
+                text_to_read = text_to_read.replace( '.', ' dot ' )
+
+            for audio_chunk in self.speech_voice.synthesize(text_to_read):
+                # AudioChunk has .audio_int16_array property that returns numpy array
+                audio_chunks.append(audio_chunk.audio_int16_array)
+            
+            audio_data = np.concatenate(audio_chunks)
+            sd.play(audio_data, samplerate=self.speech_voice.config.sample_rate)
+            sd.wait()
+
+    def set_network_services( self, services ):
+        self.network_services = services
+
+    def get_service_for( self, port, protocol='tcp' ):
+        try:
+            return self.network_services[f'{port}/{protocol}']
+        except:
+            return None
 
     def get_location( self ):
         return self.location

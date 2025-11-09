@@ -1,8 +1,8 @@
 import logging
 
 from scapy.all import *
-
-from diamondback.action import *
+from support import get_network_cidr_platform_specific
+from diamondback.action import call_before_decorator,Action
 
 class ARPScan( Action ):
     def __init__( self, *args, **kwargs ):
@@ -10,8 +10,10 @@ class ARPScan( Action ):
         self.logger = logging.getLogger( 'arpscan' )
         self.logger.info( 'initializing ARPScan action' )
 
-        i = self.get_input( )
-        self.logger.info( f'using supplied target of {i}' )
+        local_network = get_network_cidr_platform_specific()
+        self.set_input( local_network )
+
+        self.logger.info( f'using supplied target of {local_network}' )
 
     def discover_hosts_on_subnet( self, network_range=None, timeout=10 ):
         """
@@ -43,7 +45,6 @@ class ARPScan( Action ):
             hosts.append(received.psrc)
 
         self.set_output( hosts )
-        self.logger.info( self.get_output() )
     
     @call_before_decorator
     def run( self ):

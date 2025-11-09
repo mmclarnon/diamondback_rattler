@@ -5,7 +5,7 @@ serial = 1114533950505869
 [security]
 encryption_key = diamondback.key
 username = sysadmin
-password = lla
+password = 7qogP4xljqTVg+zIGsUAg1DltfXT3l2Df5igfM3VVHzdzwUrSt/kGl4iRbDwH/c/WAG+3D4C
 
 [database]
 type = sqlite
@@ -15,8 +15,9 @@ url = diamondback.sqlite
 status = /api/system/ping
 
 [execution]
-bash = 'hostname', 'whoami', 'date', 'ps aux | head -5', 'echo "the hacker D1@m0ndB@ck was here" >> suspicious_file.txt'
 wait = 30
+speak = false
+ignore = 10.0.0.1,10.0.10.1
 
 [server]
 last = 192.168.1.1
@@ -35,8 +36,8 @@ handlers = console
 
 [logger_my_app]
 level = DEBUG
-handlers = file_handler
-qualname = my_app
+handlers = file_handler,console
+qualname = diamondback
 propagate = 0
 
 [handlers]

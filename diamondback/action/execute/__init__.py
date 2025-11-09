@@ -3,7 +3,7 @@ import multiprocessing
 import random
 import time
 
-from diamondback.action import *
+from diamondback.action import call_before_decorator,Action
 from connection.ssh import SSHClientWrapped
 from domain import Command
 
@@ -12,6 +12,11 @@ class SSHCommandExecution( Action ):
         super().__init__( self, *args, **kwargs )
         self.logger = logging.getLogger( 'sshcommandexec' )
         self.logger.info( 'initializing SSHCmdExec action' )
+
+        if "sudo" in kwargs:
+            self.sudo = kwargs["sudo"]
+        else:
+            self.sudo = False
 
         i = self.get_input( )
         self.logger.info( f'using supplied target of {i}' )
@@ -56,7 +61,7 @@ class SSHCommandExecution( Action ):
                     self.session.add( new_command )
                     self.session.commit( )
 
-                r = client.execute( command )
+                r = client.execute( command,sudo=self.sudo )
                 
                 if r['out']:
                     self.logger.info(f"[{host}] Output:\n{r['out'][:200]}")  # Limit output length
@@ -74,6 +79,11 @@ class SSHCommandExecution( Action ):
     @call_before_decorator
     def run( self ):
         commands = self.commands
+        if type(commands) == str:
+            if commands.find(",") != -1:
+                commands = commands.split(",")
+            else:
+                commands = [ commands ]
         # Step 3: Execute commands on SSH-accessible hosts using multiprocessing
         if commands:
             self.logger.info(f"\nExecuting commands on host {self.get_input()}...")

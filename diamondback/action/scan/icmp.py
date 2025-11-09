@@ -6,7 +6,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import threading
 from scapy.all import *
 
-from diamondback.action import *
+from diamondback.action import call_before_decorator,Action
 
 class ICMPScan( Action ):
     def __init__( self, *args, **kwargs ):
@@ -28,7 +28,11 @@ class ICMPScan( Action ):
         else:
             self.timeout = 5
 
-        self.max_threads = kwargs['max_threads']
+        if 'max_threads' in kwargs:
+            self.max_threads = kwargs['max_threads']
+        else:
+            self.max_threads = 50
+
         self.alive_hosts = []
         self.lock = threading.Lock()
         
@@ -74,7 +78,7 @@ class ICMPScan( Action ):
         self.logger.info(f"[*] Timeout: {self.timeout}s per host")
         self.logger.info(f"[*] Max threads: {self.max_threads}")
         
-        start_time = datetime.datetime.now()
+        start_time = datetime.utcnow()
         
         # Get all host IPs (excluding network and broadcast for IPv4)
         if self.network.version == 4:
@@ -103,7 +107,7 @@ class ICMPScan( Action ):
                         self.alive_hosts.append(ip)
                     self.logger.info(f"[+] Host {ip} is alive")
         executor.shutdown(wait=True) # Blocks until all tasks are done
-        elapsed_time = datetime.datetime.now() - start_time
+        elapsed_time = datetime.utcnow() - start_time
         
         # self.logger.info summary
         self.logger.info(f"[*] Scan completed in {elapsed_time}")
