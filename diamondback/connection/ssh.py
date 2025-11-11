@@ -7,7 +7,6 @@ import time
 import traceback
 import paramiko
 
-from action import Action
 from domain import *
 from diamondback.connection import *
 
@@ -41,6 +40,9 @@ class SSHClientWrapped:
         else:
             self.client = client
 
+    def get_transport( self ):
+        return self.client.get_transport()
+
     def close( self ):
         if self.client is not None:
             self.client.close()
@@ -60,7 +62,7 @@ class SSHClientWrapped:
                 'retval': stdout.channel.recv_exit_status()}
 
 class SSHConnection( Connection ):
-    def __init__( self, target_address, username, password, key=None ):
+    def __init__( self, target_address, username, password, key=None, sudo=True ):
         super().__init__( target_address, username, password )  # Call the abstract class's __init__
         self.logger = logging.getLogger( 'sshconnection' )
         self.set_connection_type( 'ssh' )
@@ -72,45 +74,24 @@ class SSHConnection( Connection ):
         else:
             self.key = None
 
+    def execute(self,command,sudo=False):
+        return self.client.execute(command,sudo)
+
     def open( self ):
         ct = self.get_connection_type( )
         t = self.get_target()
         try:
             self.logger.info( f'opening {ct} connection to {t}' )
             # Create SSH client
-            client = paramiko.SSHClient()
-            client.load_system_host_keys( )
-            client.set_missing_host_key_policy( paramiko.AutoAddPolicy() )
-            
-            if not self.key:
-                self.logger( 'setup SSH connection with password authentication' )
-                client.connect(
-                    hostname=self.get_target(),
-                    port=self.get_port(),
-                    username=self.get_username(),
-                    password=self.get_password(),
-                    timeout=DEFAULT_CONNECTION_TIMEOUT,
-                    allow_agent=False,
-                    look_for_keys=False
-                )
-            else:
-                self.logger.info( 'setup SSH connection with key-based authentication')
-                if os.path.exists( self.key ):
-                    self.logger.info( 'treating key as filename' )
-                    # Attempt connection
-                    client.connect(
-                        hostname=self.get_target(),
-                        port=self.get_port(),
-                        username=self.get_username(),
-                        key_filename=self.key,
-                        timeout=DEFAULT_CONNECTION_TIMEOUT,
-                        allow_agent=False,
-                        look_for_keys=False
-                    )   
+            client = SSHClientWrapped(  self.get_username(), 
+                                        self.get_password(), 
+                                        t, 
+                                        self.get_port(),
+                                        self.key )
 
-            if self.client:
-                transport = client.get_transport()
-                transport.set_keepalive(interval=random.randint(45,75))
+            if client:
+                self.transport = client.get_transport()
+                self.transport.set_keepalive(interval=random.randint(45,75))
 
                 self.set_client( client )
                 self.connection_state = ConnectionState.CONNECTED
@@ -121,16 +102,20 @@ class SSHConnection( Connection ):
                 self.connection_state = ConnectionState.NOT_CONNECTED
                 self.logger.error( "did not seem to create an SSH connection" )
         except:
-            self.get_errors().append( traceback.format_exc() )
+            tb = traceback.format_exc()
+            self.logger.error( tb )
+            self.get_errors().append( tb )
             self.logger.error( 'ERROR: unable to open connection? check error logs' )
             self.connection_state = ConnectionState.ERROR
-
+        return self
+    
     def close( self ):
         t = self.get_target( )
         self.logger.info( 'closing connection to {t}' )
 
         self.get_client().close( )
         self.connection_state = ConnectionState.CLOSED
+        return self
     
     def __del__( self ):
         self.logger.info( 'connection deconstructor firing..' )
@@ -139,6 +124,9 @@ class SSHConnection( Connection ):
                 if self.get_client():
                     self.logger.info( 'calling paramiko specific close() now' )
                     self.get_client().close( )
+
+                if self.transport:
+                    self.transport.close( )
             except:
                 self.logger.warning( 'quietly handling exception closing paramiko connection' )
 

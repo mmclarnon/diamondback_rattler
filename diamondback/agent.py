@@ -364,6 +364,21 @@ class Diamondback( Client ):
     
     def run( self ):
         self.logger.info( 'agent run() started' )
+
+        def check_for_updated_configuration():
+            self.logger.info( 'checking configuration for any updates....' )
+            new_configuration = read_properties( self.path_to_configuration )
+            self.logger.info( 'configuration read' )
+            new_serial  = new_configuration.getint('general','serial')
+            if new_serial > self.configuration_serial:
+                self.logger.info( "******** UPDATE CONFIGURATION! **********")
+                self.configuration = new_configuration     
+
+        self.logger.info( 'add check for updated configuration' )
+        timer_object = threading.Timer( self.configuration.getint('execution','config_check'), 
+                                        check_for_updated_configuration )
+        timer_object.start( )
+
         # Discover all actions (happens automatically on first create)
         discovered = ActionFactory.discover_actions()
         self.logger.info(f"Discovered {len(discovered)} action classes:")
@@ -371,6 +386,7 @@ class Diamondback( Client ):
             self.logger.info(f"  - {name}")
 
         hosts_to_ignore = self.configuration.get('execution','ignore').split(",")
+        self.logger.info( f'ignoring the following targets: {hosts_to_ignore}' )
 
         lia = self.get_local_ip_address( )
         self.logger.info( f"determined local ip address of this host is {lia}, dont ever target this host" )
@@ -406,13 +422,6 @@ class Diamondback( Client ):
                 try:
                     next_action = None
                     argument_table = {}
-                    self.logger.info( 'checking configuration for any updates....' )
-                    new_configuration = read_properties( self.path_to_configuration )
-                    new_serial  = new_configuration.getint('general','serial')
-
-                    if new_serial > self.configuration_serial:
-                        self.logger.info( "******** UPDATE CONFIGURATION! **********")
-                        self.configuration = new_configuration
 
                     self.logger.info( f"executing next action {a['name']}" )
                     if "loop" in a and a["loop"]:
@@ -458,5 +467,4 @@ class Diamondback( Client ):
                 finally:
                     if len(self.targets) > 0:
                         self.logger.info( self.targets )
-
 

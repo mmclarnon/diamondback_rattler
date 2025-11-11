@@ -5,10 +5,15 @@ import time
 
 import numpy as np
 import sounddevice as sd
+import paramiko
 from piper import PiperVoice
 from piper.voice import PiperVoice
+
+from connection.ssh import SSHConnection
 from support import *
 from domain import *
+
+from util.timeout import exit_after
 
 __all__ = ['Action', 'factory']
 
@@ -34,6 +39,7 @@ def call_before_decorator(func):
     """
     def wrapper(self, *args, **kwargs):
         # The 'self' argument gives access to the class instance and its methods
+        self.open_connection( )
         logging.debug(f"--- ACTION: Calling method automatically before '{func.__name__}' ---")
         self.save_platform_action()  # Call the "before" method
         result = func(self, *args, **kwargs) # Call the original method
@@ -57,11 +63,23 @@ class Action:
         else:
             self.input = None
         self.banner = None
+        self.connection = None
+        self.connection_type = "local"
         self.start_time = time.time() 
         self.variables =    {
                                 'name': 'action',
                                 'start': self.start_time,
                             }
+        
+        if 'name' in kwargs:
+            self.name = kwargs['name']
+        else:
+            self.name = self.__class__.__name__.lower()
+
+        if "connection" in kwargs:
+            self.connection_type = kwargs["connection"]
+            self.connection = None
+
         if "configuration" in kwargs:
             self.configuration = kwargs["configuration"]
 
@@ -87,6 +105,11 @@ class Action:
             self.variables['password'] = kwargs['password']
         else:
             self.password = None
+
+        if "key" in kwargs:
+            self.key = kwargs["key"]
+        else:
+            self.key = None
 
         if 'target_address' in kwargs:
             if 'input' not in kwargs:
@@ -125,6 +148,21 @@ class Action:
                 j = ''.join([i for i in v if not i.isdigit()])
                 l = j.strip('\t')
                 self.network_services[k] = l
+
+    def set_connection_type( self, connection_type ):
+        self.connection_type = connection_type
+
+    def get_connection_type( self ):
+        return self.connection_type
+
+    def get_name( self ):
+        return self.name
+
+    def set_connection( self, connection ):
+        self.connection = connection
+    
+    def get_connection( self ):
+        return self.connection
 
     def speak_text( self, text_to_read, configuration=None ):
         audio_chunks = []
@@ -182,6 +220,7 @@ class Action:
     def set_output( self, output ):
         self.output = output
 
+    @exit_after(10)
     def lookup_command( self, command, service ):
         self.logger.info( f'lookup command details for {command}' )
         return self.session.query( Command ).filter( Command.name == command, Command.service == service ).first( )        
@@ -214,3 +253,8 @@ class Action:
         self.session.add( new_target )
         self.session.commit( )
         return new_target
+
+    def open_connection( self ):
+        self.logger.info( f"opening connection of type {self.connection_type}" )
+        if self.connection_type.lower() == "ssh":
+            self.connection = SSHConnection( self.get_input(), self.username, self.password, self.key ).open()

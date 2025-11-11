@@ -11,7 +11,7 @@ class SSHCommandExecution( Action ):
     def __init__( self, *args, **kwargs ):
         super().__init__( self, *args, **kwargs )
         self.logger = logging.getLogger( 'sshcommandexec' )
-        self.logger.info( 'initializing SSHCmdExec action' )
+        self.logger.info( f'initializing {self.get_name()} action' )
 
         if "sudo" in kwargs:
             self.sudo = kwargs["sudo"]
@@ -26,6 +26,8 @@ class SSHCommandExecution( Action ):
         else:
             self.commands = [ 'whoami' ]
 
+        self.set_connection_type( 'ssh' )
+
     def execute_commands_on_host(self, commands, port=22):
         """
         Execute commands on a remote host via SSH.
@@ -37,30 +39,39 @@ class SSHCommandExecution( Action ):
             commands: List of commands to execute
             port: SSH port
         """
-        self.logger.info(f"\n[Process {multiprocessing.current_process().pid}] "
-                f"Connecting to {self.get_input()}")
+        self.logger.info(f"[Process {multiprocessing.current_process().pid}]")
         host = self.get_input()
         try:
-            # Create SSH client
-            client = SSHClientWrapped( self.username, self.password, self.get_input(), port )
-            
-            self.logger.info(f"[{host}] Successfully connected")
+            client = self.get_connection( )
+            if client:
+                self.logger.info(f"[{host}] Successfully connected")
             
             #commands = ['hostname', 'whoami', 'date', 'ps aux | head -5', 'echo "the hacker D1@m0ndB@ck was here" >> suspicious_file.txt']
             # Execute each command
+            if type(commands) == str:
+                commands = [commands]
+
             for command in commands:
                 self.logger.info(f"[{host}] Executing: {command}")
 
                 c = self.lookup_command( command, 'ssh' )
                 if not c:
+                    self.logger.info( 'saving new command details' )
                     new_command         = Command( )
                     new_command.service = 'ssh'
                     new_command.value   = command
-                    new_command.name    = command.split(" ")[0]
+                    command_tokens = command.split(" ")
+                    if command_tokens[0] != 'sudo':
+                        new_command.name = command_tokens[0]
+                    else:
+                        new_command.name = command_tokens[1]
 
                     self.session.add( new_command )
                     self.session.commit( )
+                else:
+                    self.logger.info( f'found historical command reference {c.id}' )
 
+                self.logger.info( 'calling execute on target' )
                 r = client.execute( command,sudo=self.sudo )
                 
                 if r['out']:
@@ -75,7 +86,8 @@ class SSHCommandExecution( Action ):
             self.logger.info(f"[{host}] Connection closed")
         except Exception as e:
             self.logger.error(f"[{host}] Error: {str(e)}")
-
+        return 0
+    
     @call_before_decorator
     def run( self ):
         commands = self.commands
@@ -86,21 +98,10 @@ class SSHCommandExecution( Action ):
                 commands = [ commands ]
         # Step 3: Execute commands on SSH-accessible hosts using multiprocessing
         if commands:
-            self.logger.info(f"\nExecuting commands on host {self.get_input()}...")
-            self.logger.info(f"Commands to execute: {list(commands)}\n")
+            self.logger.info(f"Executing commands on host {self.get_input()}...")
+            self.logger.info(f"Commands to execute: {list(commands)}")
             
-            # Create a process for each host
-            processes = []
-            process = multiprocessing.Process(
-                target=self.execute_commands_on_host,
-                args=(list(commands), 22)
-            )
-            process.start()
-            processes.append(process)
-            
-            # Wait for all processes to complete
-            for process in processes:
-                process.join()
+            self.execute_commands_on_host(commands, 22)
             
             self.logger.info("\n✓ Command execution completed on all hosts")
 

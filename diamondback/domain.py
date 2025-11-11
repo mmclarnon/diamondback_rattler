@@ -86,6 +86,9 @@ class TargetService( Versioned, Base ):
         index=True  # Index for faster joins
     )
 
+    def __str__(self):
+        return f"<Target:{self.name}>"
+
     name               = mapped_column( String, default=None, nullable=True )
     banner             = mapped_column( String, default=None, nullable=True )
     port               = mapped_column( Integer, default=0, nullable=True )

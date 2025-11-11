@@ -28,6 +28,7 @@ class Connection(ABC):
         self.set_password( password )
         self.set_port( port )
         self.set_client( None )
+        self.transport = None
         self.timestamp = 0
         self.connection_state = ConnectionState.UNKNOWN
 
