@@ -111,7 +111,7 @@ class SSHConnection( Connection ):
     
     def close( self ):
         t = self.get_target( )
-        self.logger.info( 'closing connection to {t}' )
+        self.logger.info( f'closing connection to {t}' )
 
         self.get_client().close( )
         self.connection_state = ConnectionState.CLOSED

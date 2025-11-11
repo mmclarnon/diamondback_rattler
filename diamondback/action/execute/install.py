@@ -46,15 +46,12 @@ class InstallPackage( Action ):
                 f"Connecting to {self.get_input()}")
         host = self.get_input()
         try:
-            # Create SSH client
-            client = SSHClientWrapped( self.username, self.password, self.get_input(), 22 )
-            
             self.logger.info(f"[{host}] Successfully connected, executing: {self.command}")
 
             c = self.lookup_command( self.command[0], 'ssh' )
             if not c:
                 new_command         = Command( )
-                new_command.service = 'ssh'
+                new_command.service = self.get_connection_type()
                 new_command.value   = self.command
                 new_command.name    = self.command.split(" ")[0]
 
@@ -63,16 +60,12 @@ class InstallPackage( Action ):
 
             formatted_command = f'{self.command} {package}'
 
-            r = client.execute( formatted_command, sudo=True )
+            r = self.get_connection().execute( formatted_command, sudo=True )
                 
             if r['out']:
                 self.logger.info(f"[{host}] Output:\n{r['out'][:200]}")  # Limit output length
             if r['err']:
                 self.logger.error(f"[{host}] Error: {r['err']}")
-                            
-            # Close connection
-            client.close()
-            self.logger.info(f"[{host}] Connection closed")
         except Exception as e:
             self.logger.error(f"[{host}] Error: {str(e)}")
 
@@ -80,7 +73,8 @@ class InstallPackage( Action ):
     def run( self ):
         self.logger.info(f"\Installing package on host {self.get_input()}...")
         
-        self.execute_command_via_ssh( self.package )
+        if self.get_connection_type() == "ssh":
+            self.execute_command_via_ssh( self.package )
 
         self.logger.info("installation completed on target")
         return self

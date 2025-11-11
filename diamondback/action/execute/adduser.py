@@ -1,0 +1,88 @@
+import logging
+import multiprocessing
+
+from diamondback.domain import Command
+from diamondback.action import call_before_decorator,Action
+from diamondback.connection.ssh import SSHClientWrapped
+
+class AddUser( Action ):
+    def __init__( self, *args, **kwargs ):
+        super().__init__( self, *args, **kwargs )
+        self.logger = logging.getLogger( 'adduser' )
+        self.logger.info( 'initializing Add User action' )
+
+        i = self.get_input( )
+        self.logger.info( f'using supplied target of {i}' )
+    
+        if "sudo" in kwargs:
+            self.sudo = kwargs["sudo"]
+        else:
+            self.sudo = False
+
+        if 'username' in kwargs:
+            self.username = kwargs['username']
+        else:
+            self.username = None
+
+        if 'username_to_add' in kwargs:
+            self.new_username = kwargs['username_to_add']
+
+        if 'new_password' in kwargs:
+            self.new_password = kwargs['new_password']
+
+    def create_user(self, username=None, full_name="", password=None):
+        """
+        Create a new user on Ubuntu Linux with sudo and adm group membership.
+        Requires root/sudo privileges to run.
+        """
+        try:
+            if not username:
+                username = self.new_username 
+            
+            if not password:
+                password = self.new_password
+
+            cmd = [
+                'useradd',
+                '-m',  # Create home directory
+                '-s', '/bin/bash',  # Set bash as default shell
+                '-G', 'sudo,adm',  # Add to sudo and adm groups
+                #'-c', full_name,  # Full name/comment
+                username
+            ]
+            
+            self.logger.info(f"Creating user '{username}'...")
+            output = self.get_connection().execute(" ".join(cmd), sudo=True)
+            self.logger.info(f"User '{username}' created successfully")
+            self.logger.info( output )
+            
+            # Set password if provided
+            if password:
+                self.logger.info(f"Setting password for '{username}'...")
+                # Use chpasswd to set the password
+                passwd_cmd = f'echo "{username}:{password}" | chpasswd'
+                self.get_connection().execute(passwd_cmd, sudo=True)
+                self.logger.info("Password set successfully")
+            
+            # Verify the user was created and show user info
+            self.logger.info("Verifying user creation...")
+            id_output = self.get_connection().execute(f'id {username}', sudo=True)
+            self.logger.info(f"User info: {id_output}")
+            
+            # Show the groups
+            groups_output = self.get_connection().execute(f'groups {username}', sudo=True)
+            self.logger.info(f"Groups: {groups_output}")
+        
+            return True
+        except Exception as e:
+            self.logger.error(f"Unexpected error: {e}")
+            return False
+
+    @call_before_decorator
+    def run( self ):
+        self.logger.info(f"\Adding new user on host {self.get_input()}...")
+        
+        self.create_user( )
+
+        self.logger.info("adduser completed on target")
+        return self
