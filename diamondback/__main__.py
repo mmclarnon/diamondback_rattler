@@ -258,11 +258,15 @@ def basic(ctx, operation, network, commands, skip_discovery, hosts):
         operation = "basic"
 
     path_to_opplan = os.path.join( OPPLAN_DIRECTORY, f"{operation}.json" )
-    with open( path_to_opplan, "rb" ) as reader:
-        opplan  = json.load( reader )
-        logger.info( f"read operational plan {operation}" )
-        d.set_operation_plan( opplan )
-
+    logger.info( f"attempting to open operational play {path_to_opplan}" )
+    try:
+        with open( path_to_opplan, "rb" ) as reader:
+            opplan  = json.load( reader )
+            logger.info( f"read operational plan {operation}" )
+            d.set_operation_plan( opplan )
+    except:
+        logger.error( "unable to load this opplan?" )
+        sys.exit( -1 )
     try:
         d.run( )
         return None

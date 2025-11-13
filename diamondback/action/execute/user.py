@@ -50,6 +50,7 @@ class AddUser( Action ):
                 #'-c', full_name,  # Full name/comment
                 username
             ]
+            self.logger.info( cmd )
             
             self.logger.info(f"Creating user '{username}'...")
             output = self.get_connection().execute(" ".join(cmd), sudo=True)
@@ -85,4 +86,59 @@ class AddUser( Action ):
         self.create_user( )
 
         self.logger.info("adduser completed on target")
+        return self
+    
+class RemoveUser( Action ):
+    def __init__( self, *args, **kwargs ):
+        super().__init__( self, *args, **kwargs )
+        self.logger = logging.getLogger( 'removeuser' )
+        self.logger.info( 'initializing Remove User action' )
+
+        i = self.get_input( )
+        self.logger.info( f'using supplied target of {i}' )
+    
+        if "sudo" in kwargs:
+            self.sudo = kwargs["sudo"]
+        else:
+            self.sudo = False
+
+        if 'username' in kwargs:
+            self.username = kwargs['username']
+        else:
+            self.username = None
+
+        if 'username_to_remove' in kwargs:
+            self.new_username = kwargs['username_to_remove']
+
+    def remove_user(self, username=None ):
+        """
+        Removes an existing user on Ubuntu Linux.
+        """
+        try:
+            if not username:
+                username = self.new_username 
+
+            cmd = [
+                '/usr/sbin/userdel',
+                username
+            ]
+            self.logger.info( cmd )
+            
+            self.logger.info(f"Removing user '{username}'...")
+            output = self.get_connection().execute(" ".join(cmd), sudo=True)
+            self.logger.info(f"User '{username}' REMOVED successfully")
+            self.logger.info( output )
+            
+            return True
+        except Exception as e:
+            self.logger.error(f"Unexpected error: {e}")
+            return False
+
+    @call_before_decorator
+    def run( self ):
+        self.logger.info(f"\Removing user from host {self.get_input()}...")
+        
+        self.remove_user( )
+
+        self.logger.info("remove completed on target")
         return self

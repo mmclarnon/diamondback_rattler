@@ -9,6 +9,7 @@ import paramiko
 from piper import PiperVoice
 from piper.voice import PiperVoice
 
+from connection import Connection
 from connection.ssh import SSHConnection
 from support import *
 from domain import *
@@ -71,6 +72,11 @@ class Action:
                                 'start': self.start_time,
                             }
         
+        if 'skip' in kwargs:
+            self._should_skip = kwargs['skip']
+        else:
+            self._should_skip = False
+
         if 'name' in kwargs:
             self.name = kwargs['name']
         else:
@@ -149,6 +155,9 @@ class Action:
                 l = j.strip('\t')
                 self.network_services[k] = l
 
+    def should_skip( self ):
+        return self._should_skip
+
     def set_connection_type( self, connection_type ):
         self.connection_type = connection_type
 
@@ -161,7 +170,7 @@ class Action:
     def set_connection( self, connection ):
         self.connection = connection
     
-    def get_connection( self ):
+    def get_connection( self ) -> Connection:
         return self.connection
 
     def speak_text( self, text_to_read, configuration=None ):

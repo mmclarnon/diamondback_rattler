@@ -117,6 +117,9 @@ class SSHConnection( Connection ):
         self.connection_state = ConnectionState.CLOSED
         return self
     
+    def get_client(self):
+        return super().get_client().client
+
     def __del__( self ):
         self.logger.info( 'connection deconstructor firing..' )
         if self.connection_state != ConnectionState.CLOSED:

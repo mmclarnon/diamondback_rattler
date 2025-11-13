@@ -21,3 +21,5 @@ sounddevice==0.5.3
 soundfile==0.12.1 
 numpy<2
 ipaddress
+pywinrm==0.5.0
+impacket==0.13.0

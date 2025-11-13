@@ -442,22 +442,27 @@ class Diamondback( Client ):
                                     la["input"] = t
                                     argument_table = arguments | la
                                     next_action = ActionFactory.create(la['name'], **argument_table)
-                                    next_action.run( )
-                                    if next_action.get_output():
-                                        self.get_targets()[la["input"]] = self.lookup_host_by_address(la["input"])
+                                    if next_action.should_skip():
+                                        self.logger.info("opplan has configured skipping this action")
+                                        time.sleep( 10 )
+                                    else:
+                                        next_action.run( )
+                                        if next_action.get_output():
+                                            self.get_targets()[la["input"]] = self.lookup_host_by_address(la["input"])
                             else:
                                 self.logger.warning( f"********** configuration has me skipping the target {t}" )
                     else:
-                        if "skip" in a and a["skip"]:
-                            self.logger.info("user has configured skipping of this action")
+                        self.logger.info( 'executing top-level normal action' )
+                        argument_table = arguments | a 
+                        next_action = ActionFactory.create(a['name'], **argument_table)
+                        if next_action.should_skip():
+                            self.logger.info("opplan has configured skipping this action")
+                            time.sleep( 10 )
                         else:
-                            self.logger.info( 'executing top-level normal action' )
-                            argument_table = arguments | a 
-                            next_action = ActionFactory.create(a['name'], **argument_table)
                             next_action.run( )
 
                     if 'update_host' in a and a['update_host']:
-                        if next_action:
+                        if next_action and next_action.get_output():
                             self.logger.info( next_action.get_output() )
                             self.update_hosts( next_action.get_output() )
                 except KeyboardInterrupt:

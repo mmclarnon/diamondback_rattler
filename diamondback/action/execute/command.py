@@ -5,11 +5,11 @@ from diamondback.domain import Command
 from diamondback.action import call_before_decorator,Action
 from diamondback.connection.ssh import SSHClientWrapped
 
-class InstallPackage( Action ):
+class ExecuteCommand( Action ):
     def __init__( self, *args, **kwargs ):
         super().__init__( self, *args, **kwargs )
-        self.logger = logging.getLogger( 'installpkg' )
-        self.logger.info( 'initializing Install Package action' )
+        self.logger = logging.getLogger( 'executecmd' )
+        self.logger.info( 'initializing ExecuteCommand action' )
 
         i = self.get_input( )
         self.logger.info( f'using supplied target of {i}' )
@@ -19,28 +19,22 @@ class InstallPackage( Action ):
         else:
             self.sudo = False
 
-        if 'commands' in kwargs:
-            self.command = kwargs['commands']
-        else:
-            self.command = 'sudo apt install -y {package}'
+        self.variables = {}
+        if 'command' in kwargs:
+            self.original_command = kwargs['command']
 
-        if 'package' in kwargs:
-            self.package = kwargs['package']
+            self.variables = kwargs
 
-            vars =  {
-                        'package': self.package
-                    }
-            
-            self.command = self.command.format( **vars )
+            self.command = self.original_command.format( **self.variables )
 
-    def execute_command_via_ssh(self, package):
+    def execute_command( self ):
         """
-        Execute commands on a remote host via SSH.
+        Execute commands on a remote host.
         
         Args:
             host: IP address of the host
-            username: SSH username
-            password: SSH password
+            username: username
+            password: password
         """
         self.logger.info(f"\n[Process {multiprocessing.current_process().pid}] "
                 f"Connecting to {self.get_input()}")
@@ -48,7 +42,7 @@ class InstallPackage( Action ):
         try:
             self.logger.info(f"[{host}] Successfully connected, executing: {self.command}")
 
-            c = self.lookup_command( self.command[0], 'ssh' )
+            c = self.lookup_command( self.command, 'ssh' )
             if not c:
                 new_command         = Command( )
                 new_command.service = self.get_connection_type()
@@ -58,12 +52,10 @@ class InstallPackage( Action ):
                 self.session.add( new_command )
                 self.session.commit( )
 
-            formatted_command = f'{self.command} {package}'
-
-            r = self.get_connection().execute( formatted_command, sudo=True )
+            r = self.get_connection().execute( self.command, sudo=True )
                 
             if r['out']:
-                self.logger.info(f"[{host}] Output:\n{r['out'][:200]}")  # Limit output length
+                self.logger.info(f"[{host}] Output:{r['out'][:200]}")  # Limit output length
             if r['err']:
                 self.logger.error(f"[{host}] Error: {r['err']}")
         except Exception as e:
@@ -71,10 +63,9 @@ class InstallPackage( Action ):
 
     @call_before_decorator
     def run( self ):
-        self.logger.info(f"\Installing package on host {self.get_input()}...")
+        self.logger.info(f"\execute command on target {self.get_input()}...")
         
-        if self.get_connection_type() == "ssh":
-            self.execute_command_via_ssh( self.package )
+        self.execute_command( )
 
         self.logger.info("installation completed on target")
         return self

@@ -11,7 +11,7 @@ class FileSystemAction( Action ):
     def __init__( self, *args, **kwargs ):
         super().__init__( self, *args, **kwargs )
         self.logger = logging.getLogger( 'filesystemaction' )
-        self.logger.info( 'initializing SSHCmdExec action' )
+        self.logger.info( 'initializing FileSystem action' )
 
         if "sudo" in kwargs:
             self.sudo = kwargs["sudo"]
@@ -21,7 +21,7 @@ class FileSystemAction( Action ):
         i = self.get_input( )
         self.logger.info( f'using supplied target of {i}' )
     
-        if 'commands' in kwargs:
-            self.commands = kwargs['commands']
+        if 'remote_file' in kwargs:
+            self.remote_file = kwargs['remote_file']
         else:
-            self.commands = [ 'whoami' ]
+            self.remote_file = '/tmp/diamondback.tmp'
