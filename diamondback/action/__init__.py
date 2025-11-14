@@ -11,6 +11,7 @@ from piper.voice import PiperVoice
 
 from connection import Connection
 from connection.ssh import SSHConnection
+from connection.winrm import WinRMConnection
 from support import *
 from domain import *
 
@@ -269,3 +270,6 @@ class Action:
         self.logger.info( f"opening connection of type {self.connection_type}" )
         if self.connection_type.lower() == "ssh":
             self.connection = SSHConnection( self.get_input(), self.username, self.password, self.key ).open()
+        elif self.connection_type.lower == "winrm":
+            self.connection = WinRMConnection( self.get_input(), self.username, self.password ).open( )
+

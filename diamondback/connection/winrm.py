@@ -25,7 +25,8 @@ class WinRMConnection( Connection ):
         t = self.get_target()
         try:
             self.logger.info( f'opening {ct} connection to {t}' )
-
+            self.client = winrm.Session(self.get_target(), auth=(self.get_username(),self.get_password()))
+            self.connection_state = ConnectionState.CONNECTED
         except:
             tb = traceback.format_exc()
             self.logger.error( tb )
