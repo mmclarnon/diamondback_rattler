@@ -13,6 +13,8 @@ from diamondback.action import call_before_decorator,Action
 from connection.ssh import SSHClientWrapped
 from domain import Command
 
+logger = logging.getLogger( 'execute' )
+
 class SSHCommandExecution( Action ):
     def __init__( self, *args, **kwargs ):
         super().__init__( self, *args, **kwargs )
@@ -136,31 +138,31 @@ def detect_package_manager(ssh_client: paramiko.SSHClient) -> Optional[Dict[str,
         {
             'name': 'apt',
             'check_cmd': 'which apt',
-            'install_cmd': 'apt install -y {}',
+            'install_cmd': 'apt install -y {package}',
             'update_cmd': 'apt update',
             'upgrade_cmd': 'apt upgrade -y',
             'search_cmd': 'apt search',
-            'remove_cmd': 'apt remove -y {}',
+            'remove_cmd': 'apt remove -y {package}',
             'distro': 'Debian/Ubuntu'
         },
         {
             'name': 'dnf',
             'check_cmd': 'which dnf',
-            'install_cmd': 'dnf install -y {}',
+            'install_cmd': 'dnf install -y {package}',
             'update_cmd': 'dnf check-update',
             'upgrade_cmd': 'dnf upgrade -y',
             'search_cmd': 'dnf search',
-            'remove_cmd': 'dnf remove -y {}',
+            'remove_cmd': 'dnf remove -y {package}',
             'distro': 'Fedora/RHEL 8+'
         },
         {
             'name': 'yum',
             'check_cmd': 'which yum',
-            'install_cmd': 'yum install -y {}',
+            'install_cmd': 'yum install -y {package}',
             'update_cmd': 'yum check-update',
             'upgrade_cmd': 'yum update -y',
             'search_cmd': 'yum search',
-            'remove_cmd': 'yum remove -y {}',
+            'remove_cmd': 'yum remove -y {package}',
             'distro': 'CentOS/RHEL 7'
         },
         {
@@ -176,11 +178,11 @@ def detect_package_manager(ssh_client: paramiko.SSHClient) -> Optional[Dict[str,
         {
             'name': 'apk',
             'check_cmd': 'which apk',
-            'install_cmd': 'apk add {}',
+            'install_cmd': 'apk add {package}',
             'update_cmd': 'apk update',
             'upgrade_cmd': 'apk upgrade',
             'search_cmd': 'apk search',
-            'remove_cmd': 'apk del {}',
+            'remove_cmd': 'apk del {package}',
             'distro': 'Alpine'
         }
     ]
@@ -195,7 +197,7 @@ def detect_package_manager(ssh_client: paramiko.SSHClient) -> Optional[Dict[str,
                 # Package manager found
                 result = stdout.read().decode('utf-8').strip()
                 if result:  # Ensure we got a path back
-                    print(f"Detected package manager: {pm['name']} ({pm['distro']})")
+                    logging.info(f"Detected package manager: {pm['name']} ({pm['distro']})")
                     return {
                         'manager': pm['name'],
                         'install_cmd': pm['install_cmd'],
@@ -206,10 +208,10 @@ def detect_package_manager(ssh_client: paramiko.SSHClient) -> Optional[Dict[str,
                         'distro': pm['distro']
                     }
         except Exception as e:
-            print(f"Error checking for {pm['name']}: {e}")
+            logging.info(f"Error checking for {pm['name']}: {e}")
             continue
     
-    print("No supported package manager found")
+    logging.info("No supported package manager found")
     return None
 
 
@@ -260,15 +262,15 @@ class RemotePackageManager:
     
     def update_package_cache(self) -> bool:
         """Update the package manager cache"""
-        print(f"Updating package cache using {self.package_info['manager']}...")
+        logging.info(f"Updating package cache using {self.package_info['manager']}...")
         exit_status, stdout, stderr = self.execute_command(self.package_info['update_cmd'])
         
         if exit_status == 0 or (exit_status == 100 and self.package_info['manager'] == 'dnf'):
             # dnf returns 100 when there are updates available
-            print("Package cache updated successfully")
+            logging.info("Package cache updated successfully")
             return True
         else:
-            print(f"Failed to update package cache: {stderr}")
+            logging.info(f"Failed to update package cache: {stderr}")
             return False
     
     def install_package(self, package_name: str, update_first: bool = False) -> bool:
@@ -286,15 +288,15 @@ class RemotePackageManager:
             self.update_package_cache()
         
         command = f"{self.package_info['install_cmd']} {package_name}"
-        print(f"Installing package '{package_name}' with: {command}")
+        logging.info(f"Installing package '{package_name}' with: {command}")
         
         exit_status, stdout, stderr = self.execute_command(command)
         
         if exit_status == 0:
-            print(f"Successfully installed {package_name}")
+            logging.info(f"Successfully installed {package_name}")
             return True
         else:
-            print(f"Failed to install {package_name}: {stderr}")
+            logging.info(f"Failed to install {package_name}: {stderr}")
             return False
     
     def install_multiple_packages(self, packages: list, update_first: bool = True) -> Dict[str, bool]:
@@ -322,15 +324,15 @@ class RemotePackageManager:
     def remove_package(self, package_name: str) -> bool:
         """Remove a package from the remote system"""
         command = f"{self.package_info['remove_cmd']} {package_name}"
-        print(f"Removing package '{package_name}' with: {command}")
+        logging.info(f"Removing package '{package_name}' with: {command}")
         
         exit_status, stdout, stderr = self.execute_command(command)
         
         if exit_status == 0:
-            print(f"Successfully removed {package_name}")
+            logging.info(f"Successfully removed {package_name}")
             return True
         else:
-            print(f"Failed to remove {package_name}: {stderr}")
+            logging.info(f"Failed to remove {package_name}: {stderr}")
             return False
     
     def is_package_installed(self, package_name: str) -> bool:
@@ -371,8 +373,8 @@ def main():
         # Method 1: Using the standalone function
         pm_info = detect_package_manager(ssh)
         if pm_info:
-            print(f"\nPackage Manager: {pm_info['manager']}")
-            print(f"Install Command: {pm_info['install_cmd']}")
+            logging.info(f"\nPackage Manager: {pm_info['manager']}")
+            logging.info(f"Install Command: {pm_info['install_cmd']}")
             
             # Install a package using the detected command
             install_cmd = f"sudo {pm_info['install_cmd']} htop"
@@ -380,37 +382,37 @@ def main():
             exit_status = stdout.channel.recv_exit_status()
             
             if exit_status == 0:
-                print("Package installed successfully")
+                logging.info("Package installed successfully")
         
         # Method 2: Using the RemotePackageManager class
-        print("\n" + "="*50)
-        print("Using RemotePackageManager class:")
-        print("="*50)
+        logging.info("\n" + "="*50)
+        logging.info("Using RemotePackageManager class:")
+        logging.info("="*50)
         
         rpm = RemotePackageManager(ssh)
         
         # Check if package is installed
         if rpm.is_package_installed('curl'):
-            print("curl is already installed")
+            logging.info("curl is already installed")
         else:
-            print("curl is not installed, installing...")
+            logging.info("curl is not installed, installing...")
             rpm.install_package('curl', update_first=True)
         
         # Install multiple packages
         packages_to_install = ['wget', 'nano', 'git']
         results = rpm.install_multiple_packages(packages_to_install)
         
-        print("\nInstallation Results:")
+        logging.info("\nInstallation Results:")
         for package, success in results.items():
             status = "✓" if success else "✗"
-            print(f"  {status} {package}")
+            logging.info(f"  {status} {package}")
         
     except paramiko.AuthenticationException:
-        print("Authentication failed")
+        logging.info("Authentication failed")
     except paramiko.SSHException as e:
-        print(f"SSH connection error: {e}")
+        logging.info(f"SSH connection error: {e}")
     except Exception as e:
-        print(f"Error: {e}")
+        logging.info(f"Error: {e}")
     finally:
         ssh.close()
 
@@ -451,11 +453,11 @@ def example_with_context_manager():
     
     with remote_package_manager('192.168.1.100', 'admin', password='password') as rpm:
         # The connection is automatically handled
-        print(f"Connected to system using {rpm.package_info['manager']}")
+        logging.info(f"Connected to system using {rpm.package_info['manager']}")
         
         # Install packages
         rpm.install_package('tmux', update_first=True)
         
         # Check installation
         if rpm.is_package_installed('tmux'):
-            print("tmux installation verified")
+            logging.info("tmux installation verified")

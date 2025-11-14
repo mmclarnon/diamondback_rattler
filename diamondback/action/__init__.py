@@ -72,6 +72,8 @@ class Action:
                                 'start': self.start_time,
                             }
         
+        self.variables = self.variables | kwargs
+        
         if 'skip' in kwargs:
             self._should_skip = kwargs['skip']
         else:

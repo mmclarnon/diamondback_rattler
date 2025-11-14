@@ -71,7 +71,9 @@ class InstallPackage( Action ):
         if self.get_connection_type() == "ssh":
             package_manager = detect_package_manager(self.get_connection().get_client())
             self.logger.info( package_manager['install_cmd'] )
-            command = package_manager['install_cmd'].format(self.package)
+            command = str(package_manager['install_cmd']).format( **self.variables )
+
+            self.logger.info( f'command to execute-->{command}')
 
             if self.sudo:
                 self.command = f"sudo {command}"

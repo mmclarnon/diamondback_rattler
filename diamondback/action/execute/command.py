@@ -63,7 +63,7 @@ class ExecuteCommand( Action ):
 
     @call_before_decorator
     def run( self ):
-        self.logger.info(f"\execute command on target {self.get_input()}...")
+        self.logger.info(f"execute command on target {self.get_input()}...")
         
         self.execute_command( )
 
