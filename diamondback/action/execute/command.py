@@ -19,13 +19,17 @@ class ExecuteCommand( Action ):
         else:
             self.sudo = False
 
-        self.variables = {}
         if 'command' in kwargs:
             self.original_command = kwargs['command']
 
-            self.variables = kwargs
+            variables = self.variables | kwargs
 
-            self.command = self.original_command.format( **self.variables )
+            self.command = self.original_command.format( **variables )
+
+        if 'background' in kwargs and kwargs['background']:
+            if not self.command.endswith( "&" ):
+                self.logger.info( 'appending ampersand "&" character to force command to background' )
+                self.command = f"nohup {self.command} &"
 
     def execute_command( self ):
         """
@@ -36,7 +40,7 @@ class ExecuteCommand( Action ):
             username: username
             password: password
         """
-        self.logger.info(f"\n[Process {multiprocessing.current_process().pid}] "
+        self.logger.info(f"[Process {multiprocessing.current_process().pid}] "
                 f"Connecting to {self.get_input()}")
         host = self.get_input()
         try:
@@ -52,8 +56,8 @@ class ExecuteCommand( Action ):
                 self.session.add( new_command )
                 self.session.commit( )
 
-            r = self.get_connection().execute( self.command, sudo=True )
-                
+            r = self.get_connection().execute( self.command, sudo=self.sudo )
+            self.logger.info( 'execution completed...' )
             if r['out']:
                 self.logger.info(f"[{host}] Output:{r['out'][:200]}")  # Limit output length
             if r['err']:

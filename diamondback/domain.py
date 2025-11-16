@@ -1,3 +1,4 @@
+# https://cleverzone.medium.com/understanding-one-to-one-relationships-with-sqlalchemy-4348a307fdae
 import datetime
 from json import JSONEncoder
 import enum
@@ -41,15 +42,25 @@ class Victim( Versioned, Base ):
     name               = mapped_column( String, default=None, nullable=True )
     internet_facing_ip = mapped_column( String, default=None, nullable=True )
     has_internet       = mapped_column( Boolean, default=False )
+    location           = relationship( "Location", back_populates="victim", uselist=False )
     created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
     last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
+    current_gateway    = mapped_column( String, default=None, nullable=True )
+    targets            = relationship('Target', back_populates='victim', cascade='all, delete-orphan')
+    launch_events      = relationship('LaunchEvent', back_populates='victim', cascade='all, delete-orphan')
 
 class LaunchEvent( Versioned, Base ):
     __tablename__ = 'launch_event'
     id                 = mapped_column( Integer, primary_key=True )
     name               = mapped_column( String, default=None, nullable=True )
+    current_address    = mapped_column( String, default=None, nullable=True )
+    network_interface  = mapped_column( String, default=None, nullable=True )
+    network_gateway    = mapped_column( String, default=None, nullable=True )
+    current_address    = mapped_column( String, default=None, nullable=True )        
     created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
     last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
+    victim_id          = Column(Integer, ForeignKey('victim.id'))
+    victim             = relationship('Victim', back_populates='launch_events')
 
 class Target( Versioned, Base ):
     __tablename__ = 'target'
@@ -63,6 +74,8 @@ class Target( Versioned, Base ):
     data             = mapped_column( JSON, nullable=True )
     created_date     = mapped_column( DateTime, default=datetime.datetime.utcnow )
     last_updated     = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
+    victim_id        = Column(Integer, ForeignKey('victim.id'))
+    victim           = relationship('Victim', back_populates='targets')
 
     # One-to-Many relationship with TargetService
     # This creates a list of TargetService objects accessible via target.services
@@ -95,6 +108,8 @@ class TargetService( Versioned, Base ):
     protocol           = mapped_column( String, default=None, nullable=True )
     cpe                = mapped_column( String, default=None, nullable=True )
     created_date       = mapped_column( DateTime, default=datetime.datetime.utcnow )
+    target_id          = Column(Integer, ForeignKey('target.id'))
+
     # Many-to-One relationship with Target
     # This creates a Target object accessible via service.target
     target = relationship(
@@ -102,6 +117,7 @@ class TargetService( Versioned, Base ):
         back_populates="services",  # Bidirectional relationship
         lazy="joined"  # Eagerly load target when loading service
     )
+
     last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
 
 class Command( Versioned, Base ):
@@ -151,7 +167,9 @@ class Location(Versioned, Base):
     asn = mapped_column(String(50))  # Autonomous System Number
     raw_data = mapped_column(JSON)  # Store complete response as JSON
     query_timestamp = mapped_column(DateTime, default=datetime.datetime.utcnow)
-    
+    victim_id = Column(Integer, ForeignKey('victim.id'))
+    victim = relationship( "Victim", back_populates="location" )
+
     def __repr__(self):
         return f"<Location(ip='{self.ip}', city='{self.city}', country='{self.country}')>"
     

@@ -3,7 +3,7 @@ import multiprocessing
 
 from diamondback.domain import Command
 from diamondback.action import call_before_decorator,Action
-from diamondback.connection.ssh import SSHClientWrapped
+from diamondback.connection.ssh import SSHClientWrapped,ConnectionState
 from diamondback.action.execute import detect_package_manager
 
 class InstallPackage( Action ):
@@ -67,19 +67,21 @@ class InstallPackage( Action ):
     @call_before_decorator
     def run( self ):
         self.logger.info(f"installing package on host {self.get_input()}...")
-        
-        if self.get_connection_type() == "ssh":
-            package_manager = detect_package_manager(self.get_connection().get_client())
-            self.logger.info( package_manager['install_cmd'] )
-            command = str(package_manager['install_cmd']).format( **self.variables )
+        if not self.get_connection().connection_state == ConnectionState.CONNECTED:
+            self.logger.warning( "not connected to taget cannot install anything" )
+        else:
+            if self.get_connection_type() == "ssh":
+                package_manager = detect_package_manager(self.get_connection().get_client())
+                self.logger.info( package_manager['install_cmd'] )
+                command = str(package_manager['install_cmd']).format( **self.variables )
 
-            self.logger.info( f'command to execute-->{command}')
+                self.logger.info( f'command to execute-->{command}')
 
-            if self.sudo:
-                self.command = f"sudo {command}"
+                if self.sudo:
+                    self.command = f"sudo {command}"
 
-            self.execute_command_via_ssh( )
-        self.logger.info("installation completed on target")
+                self.execute_command_via_ssh( )
+            self.logger.info("installation completed on target")
         return self
 
 class RemovePackage( Action ):

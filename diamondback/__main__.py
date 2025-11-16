@@ -232,7 +232,7 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
 
 @diamondback_client.command(help="Simple helper to start operation for training")
 @click.option( '-o', '--operation' )
-@click.option('--network', '-n', default='10.0.10.0/24', 
+@click.option('--network', '-n',
               help='Network range to scan (CIDR notation)')
 @click.option('--commands', '-c', multiple=True,
               help='Commands to execute on discovered hosts')

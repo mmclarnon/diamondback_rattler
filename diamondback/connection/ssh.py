@@ -25,6 +25,7 @@ class SSHClientWrapped:
                     timeout    = 0 ):
         self.username = username
         self.password = password
+        self.host     = host
         if client is None:
             self.client = paramiko.SSHClient()
             self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -49,14 +50,20 @@ class SSHClientWrapped:
             self.client = None
 
     def execute( self, command, sudo=False ):
+        logging.getLogger('sshclient').info( f'calling execute({command}) with sudo={sudo} on {self.host} with password {self.password}' )
         feed_password = False
         if sudo and self.username != "root":
-            command = "sudo -S -p '' %s" % command
+            command = "sudo -S -p '' \"{}\"".format(command)
+            logging.getLogger('sshclient').info( command )
             feed_password = self.password is not None and len(self.password) > 0
         stdin, stdout, stderr = self.client.exec_command(command)
         if feed_password:
             stdin.write(self.password + "\n")
             stdin.flush()
+            logging.getLogger('sshclient').info( f'supplied sudo password for {self.username}' )
+        else:
+            logging.getLogger('sshclient').debug( f'skip SUDO password' )
+
         return {'out': stdout.read(),
                 'err': stderr.read(),
                 'retval': stdout.channel.recv_exit_status()}

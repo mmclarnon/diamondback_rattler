@@ -12,6 +12,7 @@ from piper.voice import PiperVoice
 from connection import Connection
 from connection.ssh import SSHConnection
 from connection.winrm import WinRMConnection
+from connection.reverse.shell import SocatReverseShellConnection
 from support import *
 from domain import *
 
@@ -71,6 +72,7 @@ class Action:
         self.variables =    {
                                 'name': 'action',
                                 'start': self.start_time,
+                                'my_ip': self.get_local_ip_address( )
                             }
         
         self.variables = self.variables | kwargs
@@ -85,6 +87,9 @@ class Action:
         else:
             self.name = self.__class__.__name__.lower()
 
+        if 'port' in kwargs:
+            self.port = kwargs['port']
+
         if "connection" in kwargs:
             self.connection_type = kwargs["connection"]
             self.connection = None
@@ -97,6 +102,11 @@ class Action:
 
         if "location" in kwargs:
             self.location = kwargs["location"]
+
+        if "register" in kwargs:
+            self.registration_key = kwargs["register"]
+        else:
+            self.registration_key = None
 
         if 'username' in kwargs:
             self.username = kwargs['username']
@@ -119,6 +129,11 @@ class Action:
             self.key = kwargs["key"]
         else:
             self.key = None
+
+        if "port" in kwargs:
+            self.port = kwargs["port"]
+        else:
+            self.port = 0
 
         if 'target_address' in kwargs:
             if 'input' not in kwargs:
@@ -158,16 +173,39 @@ class Action:
                 l = j.strip('\t')
                 self.network_services[k] = l
 
-    def should_skip( self ):
+    def get_local_ip_address( self ):
+        """
+        Retrieves the local network IP address of the current machine.
+        """
+        try:
+            # Create a socket object
+            s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+            # Connect to an external address (doesn't send data, just establishes a connection
+            # to get the local IP used for outbound connections)
+            s.connect(("8.8.8.8", 80))  # Google's public DNS server
+            local_ip = s.getsockname()[0]
+            s.close()
+            return local_ip
+        except socket.error as e:
+            self.logger.info(f"Error getting local IP address: {e}")
+            return None
+
+    def should_register( self ):
+        return self.registration_key is not None
+
+    def get_registration_key( self ):
+        return self.registration_key
+
+    def should_skip( self ) -> bool:
         return self._should_skip
 
     def set_connection_type( self, connection_type ):
         self.connection_type = connection_type
 
-    def get_connection_type( self ):
+    def get_connection_type( self ) -> str:
         return self.connection_type
 
-    def get_name( self ):
+    def get_name( self ) -> str:
         return self.name
 
     def set_connection( self, connection ):
@@ -181,22 +219,25 @@ class Action:
         if not configuration:
             configuration = self.configuration
 
-        if configuration.getboolean('execution','speak'):
-            if text_to_read.find( '.' ) != -1:
-                text_to_read = text_to_read.replace( '.', ' dot ' )
+        try:
+            if configuration.getboolean('execution','speak'):
+                if text_to_read.find( '.' ) != -1:
+                    text_to_read = text_to_read.replace( '.', ' dot ' )
 
-            for audio_chunk in self.speech_voice.synthesize(text_to_read):
-                # AudioChunk has .audio_int16_array property that returns numpy array
-                audio_chunks.append(audio_chunk.audio_int16_array)
-            
-            audio_data = np.concatenate(audio_chunks)
-            sd.play(audio_data, samplerate=self.speech_voice.config.sample_rate)
-            sd.wait()
-
+                for audio_chunk in self.speech_voice.synthesize(text_to_read):
+                    # AudioChunk has .audio_int16_array property that returns numpy array
+                    audio_chunks.append(audio_chunk.audio_int16_array)
+                
+                audio_data = np.concatenate(audio_chunks)
+                sd.play(audio_data, samplerate=self.speech_voice.config.sample_rate)
+                sd.wait()
+        except:
+            self.logger.warning( "failed to speak something" )
+        
     def set_network_services( self, services ):
         self.network_services = services
 
-    def get_service_for( self, port, protocol='tcp' ):
+    def get_service_for( self, port, protocol='tcp' ) -> Optional[str]:
         try:
             return self.network_services[f'{port}/{protocol}']
         except:
@@ -208,7 +249,7 @@ class Action:
     def mark_successful( self ):
         self.success = True
 
-    def was_successful( self ):
+    def was_successful( self ) -> bool:
         return self.success
 
     def add_variable( self, name, value ):
@@ -234,8 +275,9 @@ class Action:
 
     @exit_after(10)
     def lookup_command( self, command, service ):
-        self.logger.info( f'lookup command details for {command}' )
-        return self.session.query( Command ).filter( Command.name == command, Command.service == service ).first( )        
+        #self.logger.info( f'lookup command details for {command}' )
+        #return self.session.query( Command ).filter( Command.name == command, Command.service == service ).first( )        
+        return None
 
     def get_commands_for( self, service ):
         self.logger.info( f'return all commands for {service}' )
@@ -251,11 +293,11 @@ class Action:
 
         self.session.commit( )
 
-    def lookup_host_by_address( self, address ):
+    def lookup_host_by_address( self, address ) -> Target:
         self.logger.info( f'lookup host {address}' )
         return self.session.query( Target ).filter( Target.address == address ).first( )
 
-    def does_host_exist( self, target ):
+    def does_host_exist( self, target ) -> bool:
         h = self.session.query( Target ).filter( Target.address == target ).exists( )
 
     def save_target( self, target ):
@@ -272,4 +314,6 @@ class Action:
             self.connection = SSHConnection( self.get_input(), self.username, self.password, self.key ).open()
         elif self.connection_type.lower == "winrm":
             self.connection = WinRMConnection( self.get_input(), self.username, self.password ).open( )
-
+        elif self.connection_type.lower() == "socat_reverse":
+            self.connection = SocatReverseShellConnection( self.get_input(), self.username, self.password, self.port ).open()
+        return self.connection

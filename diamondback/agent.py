@@ -32,7 +32,7 @@ from diamondback.action.factory import ActionFactory
 from action import *
 from action.scan.arp import ARPScan
 from action.scan.icmp import ICMPScan
-from action.internal.wait import Sleep
+from diamondback.action.internal.sleep import Sleep
 from action.execute import SSHCommandExecution
 from support import *
 from domain import *
@@ -359,11 +359,61 @@ class Diamondback( Client ):
             s.close()
             return local_ip
         except socket.error as e:
-            print(f"Error getting local IP address: {e}")
+            self.logger.info(f"Error getting local IP address: {e}")
             return None
-    
+
+    def lookup_victim_by_location( self, location : Location ) -> Victim:
+        victim = self.session.query( Victim ).filter( Victim.location == location ).first( )
+
+        if not victim:
+            self.logger.info( f"did not locate any victim for the location {location}" )
+
+            victim = Victim( )
+
+            victim.location = location
+
+            self.session.add( victim )
+            self.session.commit( )
+
+        return victim
+
+    def get_default_gateway( self ) -> Optional[Tuple[str, str]]:
+        """
+        Get default gateway using 'ip route' command.
+        Returns gateway IP and interface name.
+        
+        Returns:
+            Tuple of (gateway_ip, interface) or None
+        """
+        try:
+            result = subprocess.run(
+                ['ip', 'route', 'show', 'default'],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            # Parse: "default via 192.168.1.1 dev eth0 proto dhcp metric 100"
+            match = re.search(r'default via (\S+)(?: dev (\S+))?', result.stdout)
+            if match:
+                gateway = match.group(1)
+                interface = match.group(2) if match.group(2) else "unknown"
+                return (gateway, interface)
+        except (subprocess.CalledProcessError, FileNotFoundError):
+            return None
+        return None
+
     def run( self ):
         self.logger.info( 'agent run() started' )
+
+        la = LaunchEvent( )
+        la.current_address = self.get_local_ip_address( )
+        (gateway,interface) = self.get_default_gateway( )
+        la.network_gateway = gateway
+        la.network_interface = interface
+
+        self.session.add( la )
+        self.session.commit( )
 
         def check_for_updated_configuration():
             self.logger.info( 'checking configuration for any updates....' )
@@ -393,7 +443,7 @@ class Diamondback( Client ):
         hosts_to_ignore.append( self.get_local_ip_address() )
 
         my_ip_info = self.query_public_ip_info()
-        my_location = NotImplementedError
+        my_location = None
         try:
             my_location = self.lookup_ip_details( my_ip_info['ip'] )
         except:
@@ -406,6 +456,11 @@ class Diamondback( Client ):
             self.logger.info( 'using previously stored record of this location' )
             self.ipaddress_details = my_location
 
+        current_victim = self.lookup_victim_by_location( my_location )
+        current_victim.launch_events.append( la )
+        la.victim = current_victim
+        self.session.commit( )
+        
         if "actions" in self.get_operation_plan():
             arguments = {
                             "session": self.session,
@@ -418,6 +473,7 @@ class Diamondback( Client ):
                             "password": self.get_password()
                         }
 
+            registered_objects = {}
             for a in self.get_operation_plan()["actions"]:
                 try:
                     next_action = None
@@ -440,15 +496,37 @@ class Diamondback( Client ):
                                 self.logger.info( f'examining potential target {t}' )
                                 for la in loop_actions:
                                     la["input"] = t
+                                    unique_key = f"{la['name']}:{la['input']}"
                                     argument_table = arguments | la
-                                    next_action = ActionFactory.create(la['name'], **argument_table)
-                                    if next_action.should_skip():
-                                        self.logger.info("opplan has configured skipping this action")
-                                        time.sleep( 10 )
+
+                                    if la['name'] == "DirectExecute":
+                                        try:
+                                            self.logger.info('execute a direct action using a previous action connection')
+                                            target_object = registered_objects[la['using']]
+                                            if target_object:
+                                                self.logger.info( 'found previous action' )
+                                                command = la['command'].format( **la )
+                                                self.logger.info( command )
+                                                target_object.get_connection().execute( command )
+                                        except:
+                                            self.logger.warning(f"cannot find a previous action named {la['using']}")
                                     else:
-                                        next_action.run( )
-                                        if next_action.get_output():
-                                            self.get_targets()[la["input"]] = self.lookup_host_by_address(la["input"])
+                                        next_action = ActionFactory.create(la['name'], **argument_table)
+                                        if next_action.should_skip():
+                                            self.logger.info("opplan has configured skipping this action")
+                                            time.sleep( 10 )
+                                        else:
+                                            next_action.run( )
+                                            if next_action.should_register():
+                                                registered_objects[next_action.get_registration_key()] = next_action
+
+                                            if next_action.get_output():
+                                                t        = self.lookup_host_by_address(la["input"])
+                                                t.victim = current_victim
+                                                self.session.commit( )
+                                                self.get_targets()[la["input"]] = t
+                                                current_victim.targets.append( t )
+                                                self.session.commit( )
                             else:
                                 self.logger.warning( f"********** configuration has me skipping the target {t}" )
                     else:
@@ -472,4 +550,10 @@ class Diamondback( Client ):
                 finally:
                     if len(self.targets) > 0:
                         self.logger.info( self.targets )
-
+            self.logger.info( 'processing of opplan completed.. close any registered connection/actions' )
+            for (k,i) in registered_objects.items():
+                if i:
+                    try:
+                        i.get_connection().close( )
+                    except:
+                        self.logger.warning( f'failed to close a connection on {i.get_name()}' )
