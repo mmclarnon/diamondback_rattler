@@ -3,6 +3,7 @@ import glob
 import logging
 import multiprocessing
 import os
+import random
 import sys
 import threading
 import time
@@ -474,6 +475,7 @@ class Diamondback( Client ):
                         }
 
             registered_objects = {}
+            self.special_values = {}
             for a in self.get_operation_plan()["actions"]:
                 try:
                     next_action = None
@@ -496,6 +498,49 @@ class Diamondback( Client ):
                                 self.logger.info( f'examining potential target {t}' )
                                 for la in loop_actions:
                                     la["input"] = t
+
+                                    for (key,value) in la.items():
+                                        if type(value) == str and value.find("random") != -1 and value.find("random}") == -1:
+                                            self.logger.info( f'found random marker in {value}' )
+                                            base_value = parse_increment_regex( 'random',value )
+                                            substring = "{random:%s}" % str(base_value)
+                                            self.logger.info( f'replace the following substring:{substring}')
+                                            special_key = f"{la['name']}-random"
+                                            if special_key in self.special_values:
+                                                self.special_values[special_key] += 1
+                                                self.logger.info( f'begin tracking special value {special_key} at {self.special_values[special_key]}' )
+                                            else:
+                                                random_value = random.randint( base_value, base_value+len(targets)+25 )
+                                                self.special_values[special_key] = random_value
+                                                self.logger.info( f'update special value {special_key} to {self.special_values[special_key]}' )
+                                            value = value.replace( substring,str(self.special_values[special_key]) )
+                                            la[key] = value
+                                        elif type(value) == str and value.find("replace") != -1:
+                                            self.logger.info( 'found replace marker' )
+                                            replace_with = parse_string_parameter(value, "replace" )
+                                            substring = "{replace:%s}" % str(replace_with)
+
+                                            self.logger.info( f'replace the following substring:{substring}')
+                                            special_key = f"{replace_with}"
+                                            
+                                            value = value.replace( substring,str(self.special_values[special_key]) )
+                                            la[key] = value
+                                        elif type(value) == str and value.find("increment") != -1:
+                                            self.logger.info( 'found increment marker' )
+                                            base_value = parse_increment_regex('increment',value)
+                                            substring = "{increment:%s}" % str(base_value)
+                                            self.logger.info( f'replace the following substring:{substring}')
+                                            special_key = f"{la['name']}-increment"
+                                            if special_key in self.special_values:
+                                                self.special_values[special_key] += 1
+                                                self.logger.info( f'begin tracking special value {special_key} at {self.special_values[special_key]}' )
+                                            else:
+                                                self.special_values[special_key] = base_value
+                                                self.logger.info( f'update special value {special_key} to {self.special_values[special_key]}' )
+                                            value = value.replace( substring,str(self.special_values[special_key]) )
+                                            self.logger.info( f'replaced with {value}')
+                                            la[key] = value
+
                                     unique_key = f"{la['name']}:{la['input']}"
                                     argument_table = arguments | la
 

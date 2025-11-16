@@ -345,6 +345,59 @@ def get_all_network_cidrs() -> List[Tuple[str, str]]:
     return networks
 
 
+def parse_increment_regex(parameter: str = "increment", text: str = None) -> Optional[int]:
+    """
+    Parse parameter value using regex.
+    Handles optional whitespace around the number.
+    
+    Args:
+        text: String containing {parameter: number}
+        parameter: Name of the parameter to search for (default: "increment")
+    
+    Returns:
+        Integer value or None if not found
+    
+    Examples:
+        parse_increment_regex("text {increment: 42}", "increment")  # Returns 42
+        parse_increment_regex("text {count: 99}", "count")          # Returns 99
+        parse_increment_regex("text {value: -5}", "value")          # Returns -5
+    """
+    # Escape parameter name to handle special regex characters
+    escaped_param = re.escape(parameter)
+    pattern = rf'\{{{escaped_param}:\s*(-?\d+)\s*\}}'
+    match = re.search(pattern, text)
+    
+    if match:
+        return int(match.group(1))
+    return None
+
+def parse_string_parameter(text: str, parameter: str = "replace") -> Optional[str]:
+    """
+    Parse string parameter value using regex.
+    Handles optional whitespace around the string.
+    
+    Args:
+        text: String containing {parameter: string_value}
+        parameter: Name of the parameter to search for (default: "replace")
+    
+    Returns:
+        String value or None if not found
+    
+    Examples:
+        parse_string_parameter("text {replace: hello}", "replace")  # Returns "hello"
+        parse_string_parameter("text {name: John}", "name")         # Returns "John"
+        parse_string_parameter("text {file: /tmp/test.txt}", "file") # Returns "/tmp/test.txt"
+    """
+    # Escape parameter name to handle special regex characters
+    escaped_param = re.escape(parameter)
+    # Match anything except closing brace, then strip whitespace
+    pattern = rf'\{{{escaped_param}:\s*([^}}]+?)\s*\}}'
+    match = re.search(pattern, text)
+    
+    if match:
+        return match.group(1).strip()
+    return None            
+
 def main():
     """Test the different methods."""
     print("Network CIDR Detection Test")
