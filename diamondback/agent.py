@@ -517,7 +517,7 @@ class Diamondback( Client ):
                                             la[key] = value
                                         elif type(value) == str and value.find("replace") != -1:
                                             self.logger.info( 'found replace marker' )
-                                            replace_with = parse_string_parameter(value, "replace" )
+                                            replace_with = parse_string_parameter( value, "replace" )
                                             substring = "{replace:%s}" % str(replace_with)
 
                                             self.logger.info( f'replace the following substring:{substring}')

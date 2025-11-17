@@ -43,6 +43,8 @@ develop:
 	@$(PIP) install -r requirements.txt
 	$(MAKE) -C ansible develop
 	mkdir data 2> /dev/null && cd data && python -m piper.download_voices en_US-amy-medium
+	curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
+	sudo sh /tmp/get-docker.sh 
 
 # Builds the app
 $(APPNAME): $(OBJ) 
