@@ -6,7 +6,7 @@ services:
       - "1337:1337" # Empire REST API
       - "5000:5000" # Empire Socket
     volumes:
-      - empire-data:/root/.empire/app-data # Persist Empire data and configs
+      - ~/.empire/app-data:/root/.empire/app-data # Persist Empire data and configs
     depends_on:
       - empire-db
 
