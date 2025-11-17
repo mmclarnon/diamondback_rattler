@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./pgdata:/var/lib/postgresql/data
+      - /home/sysadmin/workspace/diamondback_rattler/docker/pgdata:/var/lib/postgresql/data
 
   metasploit:
     image: metasploitframework/metasploit-framework:latest
@@ -38,5 +38,5 @@ services:
       EOF
       && msfrpcd -U msf -P msfpassword -a 0.0.0.0 -p 55553 -S"
     volumes:
-      - ./data:/root/.msf4
-      - ./payloads:/payloads   # Host directory for msfvenom output
+      - /home/sysadmin/workspace/diamondback_rattler/docker/data:/root/.msf4
+      - /home/sysadmin/workspace/diamondback_rattler/docker/payloads:/payloads   # Host directory for msfvenom output

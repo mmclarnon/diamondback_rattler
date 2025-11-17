@@ -404,6 +404,15 @@ class Diamondback( Client ):
             return None
         return None
 
+    def __del__( self ):
+        self.logger.info( "cleanup dangling files (e.g., malware)" )
+        paths_to_clear =    [
+                                os.path.join( PARENT_DIRECTORY, "docker", "payloads" )
+                            ]
+        
+        for p in paths_to_clear:
+            delete_all_files( p )
+
     def run( self ):
         self.logger.info( 'agent run() started' )
 
@@ -448,7 +457,7 @@ class Diamondback( Client ):
         try:
             my_location = self.lookup_ip_details( my_ip_info['ip'] )
         except:
-            pass
+            self.logger.warning( "failed to lookup local Internet accessible IP details" )
 
         if not my_location:
             self.logger.info( 'no record of this location, store one now please' )

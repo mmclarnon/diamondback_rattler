@@ -3,6 +3,7 @@ import multiprocessing
 
 from diamondback.domain import Command
 from diamondback.action import call_before_decorator,Action
+from diamondback.support import add_inbound_accept_rule,ufw_allow_port,ufw_remove_port
 
 class BindShell( Action ):
     def __init__( self, *args, **kwargs ):
@@ -23,6 +24,8 @@ class BindShell( Action ):
 
         self.command = self.original_command.format( **variables )
         self.logger.info( self.command )
+
+        self.ports_to_firewall = []
 
     def execute_command( self ):
         """
@@ -58,10 +61,19 @@ class BindShell( Action ):
         except Exception as e:
             self.logger.error(f"[{host}] Error: {str(e)}")
 
+    def __del__( self ):
+        self.logger.info( "remove UFW firewall rules added...." )
+        for p in self.ports_to_firewall:
+            ufw_remove_port( p )
+
     @call_before_decorator
     def run( self ):
         self.logger.info(f"execute BIND shell on target {self.get_input()}...")
         
+        self.logger.info( "update UFW firewall rules dawg" )
+        self.ports_to_firewall.append( self.port )
+        ufw_allow_port( self.port )
+
         self.execute_command( )
 
         self.logger.info("BIND shell execution spawned on target")

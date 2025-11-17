@@ -12,11 +12,147 @@ import os
 import re
 from typing import Optional, List, Tuple
 
+import iptc
+
 CURRENT_DIRECTORY = os.path.abspath( os.path.dirname(__file__) )
 PARENT_DIRECTORY = os.path.abspath( os.path.dirname(CURRENT_DIRECTORY) )
 DEFAULT_CONFIGURATION_FILE = 'configuration.ini'
 
 logger = logging.getLogger( 'support' )
+
+def delete_all_files(dir):
+    """
+    Delete all files in the specified directory.
+    
+    Parameters:
+        dir (str): Path to the directory whose files should be deleted.
+    """
+    if not os.path.isdir(dir):
+        raise ValueError(f"{dir} is not a valid directory")
+
+    for filename in os.listdir(dir):
+        file_path = os.path.join(dir, filename)
+        if os.path.isfile(file_path):
+            try:
+                os.remove(file_path)
+                logger.info(f"Deleted file: {file_path}")
+            except Exception as e:
+                logger.warning(f"Error deleting {file_path}: {e}")
+
+def ufw_allow_port(port: int, protocol: str = "tcp"):
+    """
+    Allow inbound connections on a specific port using UFW.
+    Default protocol is TCP.
+    """
+    try:
+        cmd = ["sudo", "ufw", "allow", f"{port}/{protocol}"]
+        print(f"Running: {' '.join(cmd)}")
+        subprocess.run(cmd, check=True)
+        print(f"Port {port}/{protocol} allowed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error allowing port {port}/{protocol}: {e}")
+
+def ufw_remove_port(port: int, protocol: str = "tcp"):
+    """
+    Remove inbound rule for a specific port if it exists using UFW.
+    Default protocol is TCP.
+    """
+    try:
+        cmd = ["sudo", "ufw", "delete", "allow", f"{port}/{protocol}"]
+        print(f"Running: {' '.join(cmd)}")
+        subprocess.run(cmd, check=True)
+        print(f"Port {port}/{protocol} rule removed successfully.")
+    except subprocess.CalledProcessError as e:
+        print(f"Error removing port {port}/{protocol}: {e}")
+
+def add_inbound_accept_rule(port, protocol="tcp", interface=None, source_ip=None):
+    """
+    Adds an inbound ACCEPT rule to the INPUT chain.
+
+    Args:
+        port (int): The destination port for the rule.
+        protocol (str): The protocol (e.g., "tcp", "udp"). Defaults to "tcp".
+        interface (str, optional): The inbound interface (e.g., "eth0").
+        source_ip (str, optional): The source IP address or network (e.g., "192.168.1.0/24").
+    """
+    logger.info( f"update firewall to allow {protocol} port {port}" )
+    table = iptc.Table(iptc.Table.FILTER)
+    chain = iptc.Chain(table, "INPUT")
+
+    rule = iptc.Rule()
+    rule.protocol = protocol
+
+    # Add interface if specified
+    if interface:
+        rule.in_interface = interface
+
+    # Add source IP if specified
+    if source_ip:
+        rule.src = source_ip
+
+    # Create a match for the destination port
+    match = rule.create_match(protocol)
+    match.dport = str(port)
+
+    # Set the target to ACCEPT
+    target = iptc.Target(rule, "ACCEPT")
+    rule.target = target
+
+    # Insert the rule into the chain
+    chain.insert_rule(rule)
+    logger.info(f"Inbound ACCEPT rule added for port {port}/{protocol}")
+
+def update_iptables_rule_with_library(old_rule_params, new_rule_params):
+    """
+    Updates an iptables rule using the python-iptables library.
+    old_rule_params: Dictionary containing parameters to identify the old rule.
+                     Example: {"protocol": "tcp", "dport": "80", "target": "ACCEPT"}
+    new_rule_params: Dictionary containing parameters for the new rule.
+                     Example: {"protocol": "tcp", "dport": "8080", "target": "ACCEPT"}
+    """
+    try:
+        table = iptc.Table(iptc.Table.FILTER)
+        chain = iptc.Chain(table, "INPUT")
+
+        # Find and delete the old rule
+        old_rule = iptc.Rule(chain)
+        if "protocol" in old_rule_params:
+            old_rule.protocol = old_rule_params["protocol"]
+        if "dport" in old_rule_params:
+            match = iptc.Match(old_rule, "tcp")
+            match.dport = old_rule_params["dport"]
+            old_rule.add_match(match)
+        if "target" in old_rule_params:
+            target = iptc.Target(old_rule, old_rule_params["target"])
+            old_rule.target = target
+
+        # Iterate and remove matching rules
+        for rule in chain.rules:
+            if rule.protocol == old_rule.protocol and \
+               hasattr(rule, 'matches') and \
+               any(m.dport == match.dport for m in rule.matches if m.name == 'tcp') and \
+               rule.target.name == old_rule.target.name:
+                chain.delete_rule(rule)
+                logger.info(f"Old rule deleted: {old_rule_params}")
+                break
+
+        # Add the new rule
+        new_rule = iptc.Rule(chain)
+        if "protocol" in new_rule_params:
+            new_rule.protocol = new_rule_params["protocol"]
+        if "dport" in new_rule_params:
+            match = iptc.Match(new_rule, "tcp")
+            match.dport = new_rule_params["dport"]
+            new_rule.add_match(match)
+        if "target" in new_rule_params:
+            target = iptc.Target(new_rule, new_rule_params["target"])
+            new_rule.target = target
+
+        chain.insert_rule(new_rule)
+        logger.info(f"New rule added: {new_rule_params}")
+
+    except Exception as e:
+        logger.info(f"Error updating iptables rule with python-iptables: {e}")
 
 def read_properties( path ) -> configparser.ConfigParser:
     our_configuration = None
@@ -89,7 +225,7 @@ def get_network_cidr_stdlib() -> Optional[str]:
         return str(network)
         
     except Exception as e:
-        print(f"Error determining network CIDR: {e}")
+        logger.info(f"Error determining network CIDR: {e}")
         return None
 
 
@@ -111,11 +247,11 @@ def get_network_cidr_platform_specific() -> Optional[str]:
         elif system == 'windows':
             return _get_cidr_windows()
         else:
-            print(f"Unsupported platform: {system}")
+            logger.info(f"Unsupported platform: {system}")
             return get_network_cidr_stdlib()  # Fallback to stdlib method
             
     except Exception as e:
-        print(f"Error with platform-specific method: {e}")
+        logger.info(f"Error with platform-specific method: {e}")
         return get_network_cidr_stdlib()  # Fallback to stdlib method
 
 
@@ -266,7 +402,7 @@ def get_network_cidr_netifaces() -> Optional[str]:
     try:
         import netifaces
     except ImportError:
-        print("netifaces library not installed. Install with: pip install netifaces")
+        logger.info("netifaces library not installed. Install with: pip install netifaces")
         return get_network_cidr_platform_specific()  # Fallback
     
     try:
@@ -302,7 +438,7 @@ def get_network_cidr_netifaces() -> Optional[str]:
         return str(network)
         
     except Exception as e:
-        print(f"Error using netifaces: {e}")
+        logger.info(f"Error using netifaces: {e}")
         return None
 
 
@@ -335,7 +471,7 @@ def get_all_network_cidrs() -> List[Tuple[str, str]]:
                             pass
                             
     except ImportError:
-        print("netifaces not available for listing all interfaces")
+        logger.info("netifaces not available for listing all interfaces")
         
         # Fallback: try to get at least the default network
         default_cidr = get_network_cidr_platform_specific()
@@ -400,38 +536,38 @@ def parse_string_parameter(text: str, parameter: str = "replace") -> Optional[st
 
 def main():
     """Test the different methods."""
-    print("Network CIDR Detection Test")
-    print("=" * 50)
+    logger.info("Network CIDR Detection Test")
+    logger.info("=" * 50)
     
     # Test standard library method
-    print("\n1. Standard Library Method:")
+    logger.info("\n1. Standard Library Method:")
     cidr = get_network_cidr_stdlib()
     if cidr:
-        print(f"   Network CIDR: {cidr}")
+        logger.info(f"   Network CIDR: {cidr}")
     else:
-        print("   No network connection detected")
+        logger.info("   No network connection detected")
     
     # Test platform-specific method
-    print("\n2. Platform-Specific Method:")
+    logger.info("\n2. Platform-Specific Method:")
     cidr = get_network_cidr_platform_specific()
     if cidr:
-        print(f"   Network CIDR: {cidr}")
+        logger.info(f"   Network CIDR: {cidr}")
     else:
-        print("   No network connection detected")
+        logger.info("   No network connection detected")
     
     # Test netifaces method
-    print("\n3. Netifaces Method (most accurate):")
+    logger.info("\n3. Netifaces Method (most accurate):")
     cidr = get_network_cidr_netifaces()
     if cidr:
-        print(f"   Network CIDR: {cidr}")
+        logger.info(f"   Network CIDR: {cidr}")
     else:
-        print("   No network connection detected")
+        logger.info("   No network connection detected")
     
     # List all networks
-    print("\n4. All Network Interfaces:")
+    logger.info("\n4. All Network Interfaces:")
     networks = get_all_network_cidrs()
     if networks:
         for interface, cidr in networks:
-            print(f"   {interface}: {cidr}")
+            logger.info(f"   {interface}: {cidr}")
     else:
-        print("   No active network interfaces found")
+        logger.info("   No active network interfaces found")

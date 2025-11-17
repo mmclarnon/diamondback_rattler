@@ -216,7 +216,7 @@ class ActionFactory:
                 mro = inspect.getmro(obj)
                 if len(mro) > 1:
                     base_class = mro[1]  # The first base class in the MRO
-                    logger.debug(f"  {name}: Base Class = {base_class.__name__}")
+                    #logger.debug(f"  {name}: Base Class = {base_class.__name__}")
                 if base_class.__name__ == 'Action' and obj is not Action:
                     # Only register if defined in this module
                     if obj.__module__ == module_name:

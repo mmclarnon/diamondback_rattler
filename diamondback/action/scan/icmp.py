@@ -21,8 +21,12 @@ class ICMPScan( Action ):
         super().__init__( *args, **kwargs )
         self.logger = logging.getLogger( 'arpscan' )
 
-        i = self.get_input( )
-        self.network = ipaddress.ip_network(i, strict=False)
+        try:
+            i = self.get_input( )
+            self.network = ipaddress.ip_network(i, strict=False)
+        except:
+            self.logger.warning( f"woah careful, this is not a valid network? {i}" )
+
         if 'timeout' in kwargs:
             self.timeout = kwargs['timeout']
         else:

@@ -1,6 +1,6 @@
 # Compiler settings - Can be customized.
 DEBUG ?= 0
-PYTHON_VERSION = 3.12
+PYTHON_VERSION = 3.11
 PLATFORM = $(shell uname -p)
 CODE_NAME = $(shell . /etc/os-release && echo $VERSION_CODENAME)
 ARCHITECTURE = $(shell dpkg --print-architecture)
@@ -27,9 +27,11 @@ APPNAME = diamondback
 CONFIGURATION_FILE = configuration.json
 CONFIGURATION_SAMPLE = $(CONFIGURATION_FILE).sample
 SRCDIR = src
-REQUIRED_PACKAGES = python3-ansible-runner \
-					libportaudio2 \
-					portaudio19-dev
+REQUIRED_PACKAGES = 	python$(PYTHON_VERSION)-venv \
+			python$(PYTHON_VERSION)-dev \
+			python3-ansible-runner \
+			libportaudio2 \
+			portaudio19-dev
 # UNIX-based OS variables & settings
 RM = /bin/rm
 

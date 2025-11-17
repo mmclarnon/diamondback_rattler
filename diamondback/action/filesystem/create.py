@@ -71,8 +71,11 @@ class FileSystemWrite( Action ):
                             write_to_remote_file( ssh_client, new_filename, self.variables['contents'], True )
 
                 if 'local_file' in self.variables and self.variables['local_file']:
+                    self.logger.info( self.variables['local_file'] )
                     if os.path.exists( self.variables['local_file'] ):
                         self.logger.info( 'copy local file to remote path?' )
                         sftp_upload_simple(ssh_client, 
                                            self.variables['local_file'] , 
                                            self.remote_file) 
+                    else:
+                        self.logger.warning( "skipping copy of local file to remote system, file does not exist?" )
