@@ -10,7 +10,6 @@ __pycache__/
 
 **/diamondback.log*
 **/*.iso
-**/data
 **/*.sqlite
 
 **/.prototype*

