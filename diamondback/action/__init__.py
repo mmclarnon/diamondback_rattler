@@ -69,6 +69,9 @@ class Action:
         self.connection = None
         self.connection_type = "local"
         self.start_time = time.time() 
+
+        self.logger = logging.getLogger( 'action' )
+
         self.variables =    {
                                 'name': 'action',
                                 'start': self.start_time,
