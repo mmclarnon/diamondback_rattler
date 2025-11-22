@@ -1,8 +1,11 @@
 import logging
 import msgpack
 import socket
-
+import subprocess
+import threading
+import time
 from diamondback.action import call_before_decorator,Action
+from diamondback.support import add_inbound_accept_rule,ufw_allow_port,ufw_remove_port
 
 class MsfRPC(Action):
     def __init__(self, *args, **kwargs):
@@ -16,7 +19,7 @@ class MsfRPC(Action):
         self.payload = kwargs.get( "payload" )
 
         self.lport = kwargs.get("lport", 5555)
-
+        self.container_name = kwargs.get("container", "metasploit")
         self.host = kwargs.get("host", self.get_local_ip_address() )
         self.port = kwargs.get("port", 55553)
         self.user = kwargs.get("user", "msf")
@@ -41,6 +44,7 @@ class MsfRPC(Action):
 
     def open(self):
         """Connect to msfrpcd and authenticate"""
+        time.sleep( 20 )
         self.logger.info( f"connecting via RPC to {self.host} on port {self.port}" )
         self.rpc_connection = socket.create_connection((self.host, self.port))
         # Authenticate
@@ -49,18 +53,63 @@ class MsfRPC(Action):
             "id": 1,
             "params": [self.user, self.password]
         }
+        self.logger.info( auth_req )
         self.rpc_connection.sendall(msgpack.packb(auth_req))
         resp = msgpack.unpackb(self.rpc_connection.recv(4096), raw=False)
+        self.logger.info( resp )
         if resp.get("result") == "success":
             self.token = resp.get("token")
             self.logger.info("Connected to msfrpcd, token acquired.")
         else:
             raise RuntimeError("Failed to authenticate to msfrpcd")
 
+    def launch_msfrpcd(self):
+        """
+        Launch the Metasploit msfrpcd daemon inside the running container.
+        """
+        cmd = [
+            "docker", "exec", self.container_name,
+            "/usr/src/metasploit-framework/msfrpcd",
+            "-U", self.user,
+            "-P", self.password,
+            "-S",
+            "-a", "0.0.0.0",
+            "-p", str(self.port),
+            "-f"   # foreground mode so the process stays attached
+        ]
+
+        try:
+            self.logger.info(f"Launching msfrpcd: {' '.join(cmd)}")
+            # Use Popen so the daemon stays running and you can interact with it
+            self.process = subprocess.Popen(cmd,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.PIPE)
+            self.logger.info("msfrpcd daemon started successfully")
+
+            # Helper to stream logs
+            def stream_output(pipe, level="info"):
+                for line in iter(pipe.readline, ''):
+                    if line.strip():
+                        getattr(self.logger, level)(f"[msfrpcd] {line.strip()}")
+                pipe.close()
+
+            # Start threads to capture stdout and stderr
+            threading.Thread(target=stream_output, args=(self.process.stdout, "info"), daemon=True).start()
+            threading.Thread(target=stream_output, args=(self.process.stderr, "error"), daemon=True).start()
+
+            return self.process
+        except subprocess.CalledProcessError as e:
+            self.logger.error(f"Error starting msfrpcd: {e}")
+            return None
+
     def run( self ):
+        proc = self.launch_msfrpcd( )
+
+        ufw_allow_port( self.port )
+
         """Setup a generic payload handler for Meterpreter on port 5555"""
         self.open( )
-       
+
         if not self.rpc_connection:
             raise RuntimeError("Not connected. Call open() first.")
 

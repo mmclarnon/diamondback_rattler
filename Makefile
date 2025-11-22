@@ -35,6 +35,13 @@ REQUIRED_PACKAGES = 	python$(PYTHON_VERSION)-venv \
 # UNIX-based OS variables & settings
 RM = /bin/rm
 
+METASPLOIT_IMAGE_NAME = diamondback_metasploit
+TAG = latest
+VERSION_FILE := ./VERSION.txt
+VERSION := $(shell cat ${VERSION_FILE})
+ARCHITECTURE = $(shell dpkg --print-architecture)
+
+
 all: 
 	@echo "built"
 
@@ -60,6 +67,11 @@ $(APPNAME): $(OBJ)
 	@-$(RM) $(BINARY) 2> /dev/null
 	@-$(UPX) -9 -o$(BINARY) $(APPNAME)
 	@-$(RM) *.d
+
+.PHONY: metasploit
+metasploit:
+	docker buildx build -t $(METASPLOIT_IMAGE_NAME):$(VERSION) --build-arg ARCHITECTURE=$(ARCHITECTURE) \
+	-f application/metasploit/Dockerfile ./application/metasploit
 
 .PHONY: test
 test:

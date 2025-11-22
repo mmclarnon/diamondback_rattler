@@ -14,16 +14,19 @@ services:
   metasploit:
     image: metasploitframework/metasploit-framework:latest
     container_name: metasploit
-    tty: true
-    stdin_open: true
     depends_on:
       - postgres
     ports:
-      - "55553:55553"   # msfrpcd default port
-      - "5555:5555"     # Meterpreter listener port
+      - "55553:55553"   # msfrpcd RPC port
+      - "5555:5555"     # example listener port
       - "6666:6666"
+    command: >
+      /usr/src/metasploit-framework/msfrpcd
+      -U msf
+      -P msfpassword
+      -a 0.0.0.0
+      -p 55553
+      -f   # foreground mode
     volumes:
       - /home/sysadmin/workspace/diamondback_rattler/docker/data:/root/.msf4
       - /home/sysadmin/workspace/diamondback_rattler/docker/payloads:/payloads
-    command: >
-      /usr/src/metasploit-framework/msfrpcd -U msf -P msfpassword -a 0.0.0.0 -p 55553 -f
