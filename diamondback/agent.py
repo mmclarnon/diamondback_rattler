@@ -138,6 +138,7 @@ class Client:
         self.targets = self.targets | target_set
 
     def set_network( self, network ):
+        print( network )
         self.network = network
 
     def get_network( self ):
@@ -184,7 +185,27 @@ class Diamondback( Client ):
         self.skip_discovery = skip_discovery
         self.logger.info( 'initialized diamondback training agent...' )
         self.operation_plan = {}
+
+        # Discover all actions (happens automatically on first create)
+        discovered = ActionFactory.discover_actions()
+        self.logger.info(f"Discovered {len(discovered)} action classes:")
+        for name in ActionFactory.list_actions():
+            self.logger.info(f"  - {name}")        
     
+        self.hosts_to_ignore = self.configuration.get('execution','ignore').split(",")
+        self.logger.info( f'ignoring the following targets: {self.hosts_to_ignore}' )
+
+        lia = self.get_local_ip_address( )
+        self.logger.info( f"determined local ip address of this host is {lia}, dont ever target this host" )
+        self.hosts_to_ignore.append( self.get_local_ip_address() )
+
+        self.my_launch_event = LaunchEvent( )
+        self.my_launch_event.current_address = self.get_local_ip_address( )
+        (gateway,interface) = self.get_default_gateway( )
+        self.my_launch_event.network_gateway = gateway
+        self.my_launch_event.network_interface = interface
+
+
     def set_operation_plan( self, opplan ):
         self.operation_plan = opplan
     
@@ -413,17 +434,55 @@ class Diamondback( Client ):
         for p in paths_to_clear:
             delete_all_files( p )
 
+    def perform_initial_planning( self ):
+        self.logger.info( 'perform initial startup steps...' )
+
+        my_ip_info = self.query_public_ip_info()
+        self.my_location = None
+        try:
+            self.my_location = self.lookup_ip_details( my_ip_info['ip'] )
+        except:
+            self.logger.warning( "failed to lookup local Internet accessible IP details" )
+
+        if not self.my_location:
+            self.logger.info( 'no record of this location, store one now please' )
+            self.ipaddress_details = self.store_ip_info( my_ip_info )
+            self.my_location = self.ipaddress_details
+        else:
+            self.logger.info( 'using previously stored record of this location' )
+            self.ipaddress_details = self.my_location
+
+        self.current_victim = self.lookup_victim_by_location( self.my_location )
+        self.current_victim.launch_events.append( self.my_launch_event )
+        self.my_launch_event.victim = self.current_victim
+        self.session.commit( )
+
+    def hunt_for_targets( self, actions=[] ):
+        self.perform_initial_planning( )        
+
+        arguments = {
+                        "session": self.session,
+                        "location": self.my_location,
+                        "stop_event": self.stop_event,
+                        "configuration": self.configuration,
+                        "context": self.context,
+                        "network": self.get_network( ),
+                        "username": self.get_username(),
+                        "password": self.get_password()
+                    }
+
+        for a in actions:
+            action_arguments = a | arguments
+
+            next_action = ActionFactory.create(a['name'], **action_arguments)
+            if next_action.should_skip():
+                self.logger.info("opplan has configured skipping this action")
+                time.sleep( 10 )
+            else:
+                next_action.run( )
+
     def run( self ):
         self.logger.info( 'agent run() started' )
-
-        la = LaunchEvent( )
-        la.current_address = self.get_local_ip_address( )
-        (gateway,interface) = self.get_default_gateway( )
-        la.network_gateway = gateway
-        la.network_interface = interface
-
-        self.session.add( la )
-        self.session.commit( )
 
         def check_for_updated_configuration():
             self.logger.info( 'checking configuration for any updates....' )
@@ -438,43 +497,11 @@ class Diamondback( Client ):
         timer_object = threading.Timer( self.configuration.getint('execution','config_check'), 
                                         check_for_updated_configuration )
         timer_object.start( )
-
-        # Discover all actions (happens automatically on first create)
-        discovered = ActionFactory.discover_actions()
-        self.logger.info(f"Discovered {len(discovered)} action classes:")
-        for name in ActionFactory.list_actions():
-            self.logger.info(f"  - {name}")
-
-        hosts_to_ignore = self.configuration.get('execution','ignore').split(",")
-        self.logger.info( f'ignoring the following targets: {hosts_to_ignore}' )
-
-        lia = self.get_local_ip_address( )
-        self.logger.info( f"determined local ip address of this host is {lia}, dont ever target this host" )
-        hosts_to_ignore.append( self.get_local_ip_address() )
-
-        my_ip_info = self.query_public_ip_info()
-        my_location = None
-        try:
-            my_location = self.lookup_ip_details( my_ip_info['ip'] )
-        except:
-            self.logger.warning( "failed to lookup local Internet accessible IP details" )
-
-        if not my_location:
-            self.logger.info( 'no record of this location, store one now please' )
-            self.ipaddress_details = self.store_ip_info( my_ip_info )
-        else:
-            self.logger.info( 'using previously stored record of this location' )
-            self.ipaddress_details = my_location
-
-        current_victim = self.lookup_victim_by_location( my_location )
-        current_victim.launch_events.append( la )
-        la.victim = current_victim
-        self.session.commit( )
         
         if "actions" in self.get_operation_plan():
             arguments = {
                             "session": self.session,
-                            "location": my_location,
+                            "location": self.my_location,
                             "stop_event": self.stop_event,
                             "target_address": self.network,
                             "configuration": self.configuration,
@@ -503,7 +530,7 @@ class Diamondback( Client ):
                             targets = self.get_targets()
                             
                         for t in targets:
-                            if t not in hosts_to_ignore:
+                            if t not in self.hosts_to_ignore:
                                 self.logger.info( f'examining potential target {t}' )
                                 for la in loop_actions:
                                     la["input"] = t
@@ -580,10 +607,10 @@ class Diamondback( Client ):
 
                                             if next_action.get_output():
                                                 t        = self.lookup_host_by_address(la["input"])
-                                                t.victim = current_victim
+                                                t.victim = self.current_victim
                                                 self.session.commit( )
                                                 self.get_targets()[la["input"]] = t
-                                                current_victim.targets.append( t )
+                                                self.current_victim.targets.append( t )
                                                 self.session.commit( )
                             else:
                                 self.logger.warning( f"********** configuration has me skipping the target {t}" )

@@ -27,6 +27,10 @@ class ICMPScan( Action ):
         except:
             self.logger.warning( f"woah careful, this is not a valid network? {i}" )
 
+        if "network" in kwargs and kwargs["network"]:
+            if type(kwargs["network"]) == str:
+                self.network = ipaddress.ip_network( kwargs["network"] )
+
         if 'timeout' in kwargs:
             self.timeout = kwargs['timeout']
         else:

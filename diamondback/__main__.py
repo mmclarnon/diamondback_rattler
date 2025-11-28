@@ -279,6 +279,41 @@ def basic(ctx, operation, network, commands, skip_discovery, hosts):
         click.echo(f"\n❌ Unexpected error: {str(e)}", err=True)
         sys.exit(1)
 
+@diamondback_client.command(help="Find targets for attack")
+@click.option('--hosts', multiple=True,
+              help='Specific hosts to scan')
+@click.option('--network', '-n',
+              help='Network range to scan (CIDR notation)')
+@click.pass_context
+def target(ctx, hosts, network):
+    """
+    basic functionality for the Diamondback Rattler malware. This should execute
+    target discovery features.
+    """
+    if ctx.obj['CONFIGURATION']:
+        logger.info( 'initialize diamondback instance with context' )
+        d = Diamondback( ctx, skip_discovery=False, hosts=hosts, network=network )
+    else:
+        logger.info( 'initialize diamondback with empty context' )
+        d = Diamondback( None, skip_discovery=False, hosts=hosts, network=network )
+    try:
+        actions =   [
+                        { "name":"ARPScan", "timeout":10, "update_host":True },
+                        { "name":"Sleep", "input":10 },
+                        { "name":"ICMPScan", "timeout":30, "update_host":True },                        
+                    ]
+        d.hunt_for_targets( actions )
+        return None
+    except PermissionError:
+        click.echo("\n❌ Error: This script requires root/administrator privileges "
+                  "for network scanning.", err=True)
+        click.echo("Please run with: sudo python script.py", err=True)
+        sys.exit(1)
+    except Exception as e:
+        click.echo(f"\n❌ Unexpected error: {str(e)}", err=True)
+        sys.exit(1)
+
+
 if __name__ == '__main__':
     # Check if running as root (required for scapy ARP scanning)
     if sys.platform != 'win32' and os.geteuid() != 0:

@@ -27,8 +27,9 @@ def delete_all_files(dir):
     Parameters:
         dir (str): Path to the directory whose files should be deleted.
     """
-    if not os.path.isdir(dir):
-        raise ValueError(f"{dir} is not a valid directory")
+    if  not os.path.exists(dir) or not os.path.isdir(dir):
+        logger.warning( f"{dir} is not a valid directory, nothing to clear" )
+        return
 
     for filename in os.listdir(dir):
         file_path = os.path.join(dir, filename)

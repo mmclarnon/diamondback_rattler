@@ -138,6 +138,11 @@ class Action:
         else:
             self.port = 0
 
+        if "network" in kwargs:
+            self.network = kwargs["network"]
+        else:
+            self.network = ""
+
         if 'target_address' in kwargs:
             if 'input' not in kwargs:
                 self.target_address = kwargs['target_address']
