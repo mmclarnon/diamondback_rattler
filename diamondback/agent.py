@@ -30,6 +30,7 @@ from connection.ssh import *
 from diamondback.action.factory import ActionFactory
 
 from action import *
+from diamondback.action.network.ssh import SSHConnectionAttempt
 from action.scan.arp import ARPScan
 from action.scan.icmp import ICMPScan
 from diamondback.action.internal.sleep import Sleep
@@ -508,25 +509,28 @@ class Diamondback( Client ):
                             if next_action and next_action.get_output():
                                 self.logger.info( next_action.get_output() )
                                 self.update_hosts( next_action.get_output() )                        
-                        for host in next_action.get_output( ):
-                            existing_target = self.lookup_host_by_address( host )
-                            if existing_target:
-                                self.logger.info( f'add new target {host}' )
-                                new_target = Target( )
-                                new_target.address = host
-                                try:
-                                    self.logger.info( 'lookup MAC address?' )
-                                    new_target.hardware_address = get_mac( host )
-                                    new_target.victim = self.current_victim
-                                    new_target.discovery_method = a['name']
-                                except:
-                                    self.logger.warning("unable to lookup hardware address")
-
-                                self.session.add( new_target )
-                            
-                    self.session.commit( )
             except:
                 self.logger.error( traceback.format_exc() )
+
+        self.logger.info( "examine live hosts for connectivity" )
+        for host in self.get_hosts( ):
+            self.logger.info( f"examining host {host}, does this target support SSH?" )
+            ssh_connection_arguments =  {
+                                            "input" : host
+                                        }
+            action_arguments = ssh_connection_arguments | arguments
+            ssh_connection = SSHConnectionAttempt( **action_arguments ).run( )
+            if ssh_connection.get_output( ):
+                self.logger.info( f"SSH connection successful! New target ID->{ssh_connection.captured_target.id}" )
+                
+                ssh_connection.captured_target.victim_id = self.current_victim.id
+                ssh_connection.captured_target.discovery_method = ssh_connection.__class__.__name__
+                ssh_connection.captured_target.hardware_address = get_mac( host )
+                ssh_connection.captured_target.connection = "ssh"
+            else:
+                self.logger.info( "SSH connection failure" )
+
+        self.session.commit( )
 
     def lookup_targeting_data( self ):
         self.logger.info( f"lookup all current targets for the victim {self.current_victim.id}" )

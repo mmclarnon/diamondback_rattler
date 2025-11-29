@@ -50,10 +50,24 @@ class SSHClientWrapped:
             self.client = None
 
     def execute( self, command, sudo=False ):
+        commands_to_filter_quotes = [   
+                                        "useradd",
+                                        "apt",
+                                        "id",
+                                        "groups"
+                                    ]
         logging.getLogger('sshclient').info( f'calling execute({command}) with sudo={sudo} on {self.host} with password {self.password}' )
         feed_password = False
+        command_altered = False
         if sudo and self.username != "root":
-            command = "sudo -S -p '' \"{}\"".format(command)
+            for c in commands_to_filter_quotes:
+                if not command_altered and command.find( c ) != -1:
+                    command = "sudo -S -p '' {}".format(command)
+                    command_altered = True
+            
+            if not command_altered:
+                command = "sudo -S -p '' \"{}\"".format(command)
+
             logging.getLogger('sshclient').info( command )
             feed_password = self.password is not None and len(self.password) > 0
         stdin, stdout, stderr = self.client.exec_command(command)

@@ -69,11 +69,13 @@ class SSHConnectionAttempt( Action ):
             self.logger.info( f'host record did not exist, save new one for {self.get_input()}' )
             host_record         = Target( )
             host_record.address = self.get_input( )
-            self.get_session().add( host_record )
-            self.get_session().commit( )
+
 
         if self.get_output( ):
             self.logger.info( 'this host has ACTIVE ssh...' )
+            self.get_session().add( host_record )
+            self.get_session().commit( )
+
             ssh_banner = self.banner
 
             ssh_service          = TargetService( )
@@ -85,6 +87,8 @@ class SSHConnectionAttempt( Action ):
             self.session.add( ssh_service )
             self.session.commit()
             self.speak_text( f'connected to {self.get_input()} using SSH')
+
+            self.captured_target = host_record
         else:
             self.logger.info( 'this host does not have active SSH' )
 

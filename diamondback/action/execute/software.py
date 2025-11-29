@@ -73,9 +73,9 @@ class InstallPackage( Action ):
             if self.get_connection_type() == "ssh":
                 package_manager = detect_package_manager(self.get_connection().get_client())
                 self.logger.info( package_manager['install_cmd'] )
-                command = str(package_manager['install_cmd']).format( **self.variables )
+                self.command = str(package_manager['install_cmd']).format( **self.variables )
 
-                self.logger.info( f'command to execute-->{command}')
+                self.logger.info( f'command to execute-->{self.command}')
 
                 self.execute_command_via_ssh( )
             self.logger.info("installation completed on target")

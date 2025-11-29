@@ -31,7 +31,8 @@ REQUIRED_PACKAGES = 	python$(PYTHON_VERSION)-venv \
 			python$(PYTHON_VERSION)-dev \
 			python3-ansible-runner \
 			libportaudio2 \
-			portaudio19-dev
+			portaudio19-dev \
+			socat 
 # UNIX-based OS variables & settings
 RM = /bin/rm
 

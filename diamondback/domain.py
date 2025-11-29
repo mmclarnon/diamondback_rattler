@@ -74,6 +74,7 @@ class Target( Versioned, Base ):
     hardware_address = mapped_column( String, default=None, nullable=True )
     cpe              = mapped_column( String, default=None, nullable=True )
     discovery_method = mapped_column( String, default=None, nullable=True )
+    connection       = mapped_column( String, default=None, nullable=True )    
     is_encoded       = mapped_column( Boolean, default=False )
     note             = mapped_column( Text, nullable=True, default=None )
     data             = mapped_column( JSON, nullable=True )

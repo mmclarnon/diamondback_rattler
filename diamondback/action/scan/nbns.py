@@ -45,6 +45,6 @@ class NBNSScan( Action ):
     def run( self ):
         self.logger.info( 'executing NBNS Scan action to discover Windows assets on target LAN' )
         self.set_output( self.sniff_nbns() )
-        self.logger.info( f'arp scan complete, found {len(self.get_output())} hosts' )
+        self.logger.info( f'NBNS scan complete, found {len(self.get_output())} hosts' )
 
         return self

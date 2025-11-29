@@ -72,7 +72,7 @@ class SocatReverseShellConnection( Connection ):
             #     f'TCP-LISTEN:{self.get_port()}'
             # ]
             
-            socat_cmd = shlex.split( f"socat TCP-LISTEN:{self.get_port()},reuseaddr,fork -" )
+            socat_cmd = shlex.split( f"/usr/bin/socat TCP-LISTEN:{self.get_port()},reuseaddr,fork -" )
 
             self.logger.info(f"[*] Starting socat listener on port {self.get_port()}...")
             self.logger.info("[*] Waiting for connection...")
