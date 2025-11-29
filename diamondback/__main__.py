@@ -232,6 +232,8 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
 
 @diamondback_client.command(help="Simple helper to start operation for training")
 @click.option( '-o', '--operation' )
+@click.option('--intel-targeting', '-i', is_flag=True,
+              help='Use targeting data stored in database')
 @click.option('--network', '-n',
               help='Network range to scan (CIDR notation)')
 @click.option('--commands', '-c', multiple=True,
@@ -241,7 +243,7 @@ def diamondback_client(ctx, configuration, quiet, debug, home, light, password, 
 @click.option('--hosts', multiple=True,
               help='Specific hosts to scan (if skip-discovery is set)')
 @click.pass_context
-def basic(ctx, operation, network, commands, skip_discovery, hosts):
+def basic(ctx, operation, intel_targeting, network, commands, skip_discovery, hosts):
     """
     basic functionality for the Diamondback Rattler malware. This should execute
     simple remote actions that a junior or entry-level analyst can spot with some 
@@ -256,6 +258,10 @@ def basic(ctx, operation, network, commands, skip_discovery, hosts):
 
     if not operation:
         operation = "basic"
+
+    if intel_targeting:
+        logger.info( 'indicate the use of stored targeting information' )
+        d.set_using_targeting( )
 
     path_to_opplan = os.path.join( OPPLAN_DIRECTORY, f"{operation}.json" )
     logger.info( f"attempting to open operational play {path_to_opplan}" )

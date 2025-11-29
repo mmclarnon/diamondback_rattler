@@ -53,7 +53,10 @@ class Client:
         self.startup_time       = time.time( )
         self.cpu_info           = cpuinfo.get_cpu_info()
         self.available_memory   = int(psutil.virtual_memory()[0]/1024)/1024
-        self.logger = logging.getLogger( 'client' )
+        self.logger             = logging.getLogger( 'client' )
+        self.use_targeting      = False
+        self.my_location        = None
+        self.current_victim     = None
         if hosts:
             self.set_hosts( hosts.split(",") )
         else:
@@ -138,6 +141,12 @@ class Client:
     def set_network( self, network ):
         print( network )
         self.network = network
+    
+    def set_using_targeting( self, flag=True ):
+        self.use_targeting = flag
+    
+    def should_use_targeting( self ):
+        return self.use_targeting
 
     def get_network( self ):
         return self.network
@@ -458,6 +467,7 @@ class Diamondback( Client ):
             self.session.commit( )
 
         self.current_victim = self.lookup_victim_by_location( self.my_location )
+        self.logger.info( 'set current victim' )
         if self.my_location.ip:
             if not self.current_victim.internet_facing_ip:
                 self.logger.info( 'update victim details to reflect IP address information' )
@@ -518,6 +528,14 @@ class Diamondback( Client ):
             except:
                 self.logger.error( traceback.format_exc() )
 
+    def lookup_targeting_data( self ):
+        self.logger.info( f"lookup all current targets for the victim {self.current_victim.id}" )
+        possible_targets = self.session.query( Target ).filter( Target.victim == self.current_victim ).all( )
+        targets = []
+        for p in possible_targets:
+            targets.append( p.address )
+        return targets
+
     def run( self ):
         self.logger.info( 'agent run() started' )
 
@@ -534,6 +552,8 @@ class Diamondback( Client ):
         timer_object = threading.Timer( self.configuration.getint('execution','config_check'), 
                                         check_for_updated_configuration )
         timer_object.start( )
+
+        self.perform_initial_planning( )
         
         if "actions" in self.get_operation_plan():
             arguments = {
@@ -561,10 +581,14 @@ class Diamondback( Client ):
                         self.logger.info( f"starting loop {a['name']}" )
                         loop_actions = a["actions"]
                         targets = []
-                        if a["target"].lower() == "host":
-                            targets = self.get_hosts()
-                        elif a["target"].lower() == "target":
-                            targets = self.get_targets()
+                        if self.should_use_targeting( ):
+                            self.logger.info( "use targeting details stored in database to speed up processing" )
+                            targets = self.lookup_targeting_data( )
+                        else:
+                            if a["target"].lower() == "host":
+                                targets = self.get_hosts()
+                            elif a["target"].lower() == "target":
+                                targets = self.get_targets()
                             
                         for t in targets:
                             if t not in self.hosts_to_ignore:
@@ -669,6 +693,7 @@ class Diamondback( Client ):
                     self.stop_event.set( )
                 except:
                     self.logger.error( traceback.format_exc() )
+                    self.stop_event.set( )
                 finally:
                     if len(self.targets) > 0:
                         self.logger.info( self.targets )

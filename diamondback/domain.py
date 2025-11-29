@@ -49,6 +49,9 @@ class Victim( Versioned, Base ):
     targets            = relationship('Target', back_populates='victim', cascade='all, delete-orphan')
     launch_events      = relationship('LaunchEvent', back_populates='victim', cascade='all, delete-orphan')
 
+    def __repr__( self ):
+        return f"<Victim id=({self.id}) address=({self.name}) ip=({self.internet_facing_ip})>"
+
 class LaunchEvent( Versioned, Base ):
     __tablename__ = 'launch_event'
     id                 = mapped_column( Integer, primary_key=True )
@@ -88,6 +91,12 @@ class Target( Versioned, Base ):
         lazy="dynamic",  # Load services dynamically (useful for large collections)
         order_by="TargetService.port"  # Order services by port
     )
+
+    def __str__( self ):
+        return self.address
+
+    def __repr__( self ):
+        return f"<Target id=({self.id}) address=({self.address}) victim=({self.victim})>"
 
 class TargetService( Versioned, Base ):
     __tablename__ = 'target_service'
