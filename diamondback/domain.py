@@ -61,6 +61,8 @@ class LaunchEvent( Versioned, Base ):
     last_updated       = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
     victim_id          = Column(Integer, ForeignKey('victim.id'))
     victim             = relationship('Victim', back_populates='launch_events')
+    location           = relationship('Location', back_populates='launch_events')    
+    location_id        = Column(Integer, ForeignKey('location.id'))
 
 class Target( Versioned, Base ):
     __tablename__ = 'target'
@@ -169,6 +171,8 @@ class Location(Versioned, Base):
     query_timestamp = mapped_column(DateTime, default=datetime.datetime.utcnow)
     victim_id = Column(Integer, ForeignKey('victim.id'))
     victim = relationship( "Victim", back_populates="location" )
+    
+    launch_events      = relationship('LaunchEvent', back_populates='location', cascade='all, delete-orphan')
 
     def __repr__(self):
         return f"<Location(ip='{self.ip}', city='{self.city}', country='{self.country}')>"

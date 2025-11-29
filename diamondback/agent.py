@@ -25,7 +25,6 @@ from typing import List, Optional
 import pwncat
 from pwncat.manager import Manager 
 
-
 from connection import *
 from connection.ssh import *
 from diamondback.action.factory import ActionFactory
@@ -38,7 +37,6 @@ from action.execute import SSHCommandExecution
 from support import *
 from domain import *
 from history_meta import versioned_session
-
 
 import requests
 import json
@@ -114,7 +112,7 @@ class Client:
 
     def load_data( self ):
         self.logger.info( 'loading operational data' )
-        for f in glob.glob( os.path.join(DATA_DIRECTORY, "*.json") ):
+        for f in glob( os.path.join(DATA_DIRECTORY, "*.json") ):
             if os.path.basename(f) in ALLOWED_DATA_FILES:
                 self.logger.info(f)
                 t = os.path.basename(f).split(".")[0]
@@ -205,7 +203,6 @@ class Diamondback( Client ):
         self.my_launch_event.network_gateway = gateway
         self.my_launch_event.network_interface = interface
 
-
     def set_operation_plan( self, opplan ):
         self.operation_plan = opplan
     
@@ -226,6 +223,7 @@ class Diamondback( Client ):
         Returns:
             Dictionary containing IP information.
         """
+        self.logger.info( 'lookup details about this location Internet facing IP' )
         
         # Primary service: ipapi.co (no API key required for basic usage)
         primary_url = f"https://ipapi.co/{ip_address or ''}/json/"
@@ -295,7 +293,8 @@ class Diamondback( Client ):
                 
             except Exception as backup_error:
                 raise Exception(f"Both services failed. Primary: {str(e)}, Backup: {str(backup_error)}")
-        
+        if result:
+            self.logger.info( f'found {result["ip"]}' )
         return result
 
     def store_ip_info(self, ip_data: Dict) -> Location:
@@ -443,16 +442,29 @@ class Diamondback( Client ):
             self.my_location = self.lookup_ip_details( my_ip_info['ip'] )
         except:
             self.logger.warning( "failed to lookup local Internet accessible IP details" )
+            self.logger.warning( traceback.format_exc() )
 
         if not self.my_location:
             self.logger.info( 'no record of this location, store one now please' )
             self.ipaddress_details = self.store_ip_info( my_ip_info )
             self.my_location = self.ipaddress_details
         else:
-            self.logger.info( 'using previously stored record of this location' )
+            self.logger.info( f'using previously stored record of this location {self.my_location}' )
             self.ipaddress_details = self.my_location
 
+        if self.my_launch_event:
+            self.logger.info( 'set location record for this launch event' )
+            self.my_launch_event.location = self.my_location
+            self.session.commit( )
+
         self.current_victim = self.lookup_victim_by_location( self.my_location )
+        if self.my_location.ip:
+            if not self.current_victim.internet_facing_ip:
+                self.logger.info( 'update victim details to reflect IP address information' )
+                self.current_victim.internet_facing_ip = self.my_location.ip
+                self.current_victim.has_internet = True
+            else:
+                self.current_victim.has_internet = False
         self.current_victim.launch_events.append( self.my_launch_event )
         self.my_launch_event.victim = self.current_victim
         self.session.commit( )
@@ -472,14 +484,39 @@ class Diamondback( Client ):
                     }
 
         for a in actions:
-            action_arguments = a | arguments
+            try:
+                action_arguments = a | arguments
 
-            next_action = ActionFactory.create(a['name'], **action_arguments)
-            if next_action.should_skip():
-                self.logger.info("opplan has configured skipping this action")
-                time.sleep( 10 )
-            else:
-                next_action.run( )
+                next_action = ActionFactory.create(a['name'], **action_arguments)
+                if next_action.should_skip():
+                    self.logger.info("opplan has configured skipping this action")
+                    time.sleep( 10 )
+                else:
+                    next_action.run( )
+                    if next_action.get_output():
+                        if 'update_host' in a and a['update_host']:
+                            if next_action and next_action.get_output():
+                                self.logger.info( next_action.get_output() )
+                                self.update_hosts( next_action.get_output() )                        
+                        for host in next_action.get_output( ):
+                            existing_target = self.lookup_host_by_address( host )
+                            if existing_target:
+                                self.logger.info( f'add new target {host}' )
+                                new_target = Target( )
+                                new_target.address = host
+                                try:
+                                    self.logger.info( 'lookup MAC address?' )
+                                    new_target.hardware_address = get_mac( host )
+                                    new_target.victim = self.current_victim
+                                    new_target.discovery_method = a['name']
+                                except:
+                                    self.logger.warning("unable to lookup hardware address")
+
+                                self.session.add( new_target )
+                            
+                    self.session.commit( )
+            except:
+                self.logger.error( traceback.format_exc() )
 
     def run( self ):
         self.logger.info( 'agent run() started' )

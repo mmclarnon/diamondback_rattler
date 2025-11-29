@@ -121,6 +121,6 @@ class ICMPScan( Action ):
         self.logger.info(f"[*] Scan completed in {elapsed_time}")
         self.logger.info(f"[*] Found {len(self.alive_hosts)} alive hosts out of {len(hosts)} scanned")
         self.set_output( self.alive_hosts )
-        
+
         return self
 

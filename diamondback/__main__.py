@@ -300,7 +300,8 @@ def target(ctx, hosts, network):
         actions =   [
                         { "name":"ARPScan", "timeout":10, "update_host":True },
                         { "name":"Sleep", "input":10 },
-                        { "name":"ICMPScan", "timeout":30, "update_host":True },                        
+                        { "name":"ICMPScan", "timeout":30, "update_host":True },
+                        { "name":"NBNSScan", "timeout":30, "update_host":True },                  
                     ]
         d.hunt_for_targets( actions )
         return None

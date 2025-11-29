@@ -12,6 +12,8 @@ import os
 import re
 from typing import Optional, List, Tuple
 
+from scapy.all import *
+
 import iptc
 
 CURRENT_DIRECTORY = os.path.abspath( os.path.dirname(__file__) )
@@ -55,7 +57,36 @@ def get_local_ip_address( ):
         return local_ip
     except socket.error as e:
         return None
-        
+
+def get_mac(ip_address, timeout=2):
+    """
+    Lookup the MAC address of a host using ARP request.
+
+    Args:
+        ip_address (str): The target IP address.
+        timeout (int): Timeout in seconds for waiting for a reply.
+
+    Returns:
+        str: The MAC address if found, otherwise None.
+    """
+    # Create an Ethernet frame with broadcast destination
+    ether = Ether(dst="ff:ff:ff:ff:ff:ff")
+    
+    # Create an ARP request asking for the given IP
+    arp = ARP(pdst=ip_address)
+    
+    # Combine Ethernet and ARP into a packet
+    packet = ether / arp
+    
+    # Send the packet and wait for response
+    result = srp(packet, timeout=timeout, verbose=False)[0]
+    
+    if result:
+        # Extract MAC address from the response
+        return result[0][1].hwsrc
+    else:
+        return None
+
 def is_port_in_use(port: int) -> bool:
     """
     Check if a given port is in use on the specified host.
