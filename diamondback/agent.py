@@ -595,9 +595,13 @@ class Diamondback( Client ):
                                 targets = self.get_targets()
                             
                         for t in targets:
+                            if t not in self.special_values:
+                                self.logger.info( f'save a table of dynamic values for {t}' )
+                                self.special_values[t] = {}
                             if t not in self.hosts_to_ignore:
                                 self.logger.info( f'examining potential target {t}' )
-                                for la in loop_actions:
+                                for la_orig in loop_actions:
+                                    la = copy.deepcopy( la_orig )
                                     la["input"] = t
 
                                     for (key,value) in la.items():
@@ -609,26 +613,31 @@ class Diamondback( Client ):
                                             special_key = f"{la['name']}-random"
                                             if special_key in self.special_values:
                                                 self.special_values[special_key] += 1
-                                                self.logger.info( f'begin tracking special value {special_key} at {self.special_values[special_key]}' )
+                                                self.special_values[t][special_key] = self.special_values[special_key]
+                                                self.logger.info( f'update special value {special_key} to {self.special_values[t][special_key]}' )
                                             else:
-                                                random_value = random.randint( base_value, base_value+len(targets)+25 )
+                                                random_value = random.randint( base_value, base_value+len(targets)+50 )
                                                 while is_port_in_use( random_value ):
                                                     self.logger.info( "if this a netowrk port its already in use, try 1 higher plz" )
                                                     random_value += 1
 
-                                                self.special_values[special_key] = random_value
-                                                self.logger.info( f'update special value {special_key} to {self.special_values[special_key]}' )
-                                            value = value.replace( substring,str(self.special_values[special_key]) )
+                                                self.special_values[special_key]    = random_value
+                                                self.special_values[t][special_key] = random_value
+                                                self.logger.info( f'now tracking special value {special_key} as {self.special_values[special_key]}' )
+                                            
+                                            value = value.replace( substring,str(self.special_values[t][special_key]) )
                                             la[key] = value
                                         elif type(value) == str and value.find("replace") != -1:
-                                            self.logger.info( 'found replace marker' )
+                                            self.logger.info( f'found replace marker in {value}' )
                                             replace_with = parse_string_parameter( value, "replace" )
                                             substring = "{replace:%s}" % str(replace_with)
 
                                             self.logger.info( f'replace the following substring:{substring}')
                                             special_key = f"{replace_with}"
                                             
-                                            value = value.replace( substring,str(self.special_values[special_key]) )
+                                            value = value.replace( substring,str(self.special_values[t][special_key]) )
+                                            self.logger.info( f'replaced value in {value}' )
+
                                             la[key] = value
                                         elif type(value) == str and value.find("increment") != -1:
                                             self.logger.info( 'found increment marker' )
@@ -637,16 +646,18 @@ class Diamondback( Client ):
                                             self.logger.info( f'replace the following substring:{substring}')
                                             special_key = f"{la['name']}-increment"
                                             if special_key in self.special_values:
-                                                self.special_values[special_key] += 1
-                                                self.logger.info( f'begin tracking special value {special_key} at {self.special_values[special_key]}' )
+                                                self.special_values[t][special_key] = self.special_values[special_key]+1
+                                                self.logger.info( f'update tracking special value {special_key} to {self.special_values[t][special_key]}' )
                                             else:
                                                 self.special_values[special_key] = base_value
-                                                self.logger.info( f'update special value {special_key} to {self.special_values[special_key]}' )
+                                                self.special_values[t][special_key] = base_value
+                                                self.logger.info( f"begin tracking {special_key} as {self.special_values[special_key]}" )
+
+                                                self.logger.info( f'now tracking special value {special_key} to {self.special_values[special_key]}' )
                                             value = value.replace( substring,str(self.special_values[special_key]) )
                                             self.logger.info( f'replaced with {value}')
                                             la[key] = value
 
-                                    unique_key = f"{la['name']}:{la['input']}"
                                     argument_table = arguments | la
 
                                     if la['name'] == "DirectExecute":
