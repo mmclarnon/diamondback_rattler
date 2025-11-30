@@ -7,7 +7,7 @@ import time
 import traceback
 import winrm
 
-from domain import *
+from diamondback.domain import *
 from diamondback.connection import *
 
 class WinRMConnection( Connection ):

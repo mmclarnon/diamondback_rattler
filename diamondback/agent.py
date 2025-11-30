@@ -491,7 +491,9 @@ class Diamondback( Client ):
                         "context": self.context,
                         "network": self.get_network( ),
                         "username": self.get_username(),
-                        "password": self.get_password()
+                        "password": self.get_password(),
+                        "victim" : self.current_victim,
+                        "manager": self.manager
                     }
 
         for a in actions:
@@ -543,6 +545,11 @@ class Diamondback( Client ):
     def run( self ):
         self.logger.info( 'agent run() started' )
 
+        self.logger.info( "create pwncat local manager" )
+        self.manager      = Manager()
+        self.manager.load_modules( )
+        self.manager.create_db_session( )        
+
         def check_for_updated_configuration():
             self.logger.info( 'checking configuration for any updates....' )
             new_configuration = read_properties( self.path_to_configuration )
@@ -568,7 +575,8 @@ class Diamondback( Client ):
                             "configuration": self.configuration,
                             "context": self.context,
                             "username": self.get_username(),
-                            "password": self.get_password()
+                            "password": self.get_password(),
+                            "manager": self.manager                            
                         }
             chosen_integer = random.randint( 2048, 3096 )
             registered_objects = {}

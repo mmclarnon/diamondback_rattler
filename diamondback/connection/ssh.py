@@ -7,7 +7,7 @@ import time
 import traceback
 import paramiko
 
-from domain import *
+from diamondback.domain import *
 from diamondback.connection import *
 
 class SSHClientWrapped:

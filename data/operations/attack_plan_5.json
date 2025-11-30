@@ -1,0 +1,16 @@
+{
+    "name" : "docker",
+    "serial": 11248585048,
+    "actions": [
+        { "name":"Sleep", "input":10 },
+        {
+            "name": "hit_each",
+            "loop": true,
+            "target": "target",
+            "actions": [
+                { "name":"PwncatSession", "connection":"pwncat", "skip":false, "commands":"whoami,ps -ef,cat /etc/passwd" }
+            ]
+        },
+        { "name":"Wait", "timeout":600 }
+    ]
+}

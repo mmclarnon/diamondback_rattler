@@ -71,5 +71,5 @@ class ExecuteCommand( Action ):
         
         self.execute_command( )
 
-        self.logger.info("installation completed on target")
+        self.logger.info("command execution completed on target")
         return self

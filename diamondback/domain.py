@@ -15,7 +15,7 @@ from sqlalchemy.orm import sessionmaker,relationship, backref
 from sqlalchemy.sql import func
 from ipaddress import IPv4Address
 
-from history_meta import Versioned
+from diamondback.history_meta import Versioned
 
 class Base(DeclarativeBase):
     pass

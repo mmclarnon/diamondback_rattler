@@ -9,14 +9,15 @@ import paramiko
 from piper import PiperVoice
 from piper.voice import PiperVoice
 
-from connection import Connection
-from connection.ssh import SSHConnection
-from connection.winrm import WinRMConnection
-from connection.reverse.shell import SocatReverseShellConnection
-from support import *
-from domain import *
+from diamondback.connection import Connection
+from diamondback.connection.ssh import SSHConnection
+from diamondback.connection.winrm import WinRMConnection
+from diamondback.connection.reverse.shell import SocatReverseShellConnection
+from diamondback.connection.pwncat import PwncatConnection
+from diamondback.support import *
+from diamondback.domain import *
 
-from util.timeout import exit_after
+from diamondback.util.timeout import exit_after
 
 __all__ = ['Action', 'factory']
 
@@ -105,6 +106,11 @@ class Action:
 
         if "location" in kwargs:
             self.location = kwargs["location"]
+
+        if "victim" in kwargs:
+            self.victim = kwargs["victim"]
+        else:
+            self.victim = None
 
         if "register" in kwargs:
             self.registration_key = kwargs["register"]
@@ -324,4 +330,6 @@ class Action:
             self.connection = WinRMConnection( self.get_input(), self.username, self.password ).open( )
         elif self.connection_type.lower() == "socat_reverse":
             self.connection = SocatReverseShellConnection( self.get_input(), self.username, self.password, self.port ).open()
+        elif self.connection_type.lower() == "pwncat":
+            self.connection = PwncatConnection( self.get_input(), self.username, self.password, self.key ).open( )
         return self.connection
