@@ -270,8 +270,9 @@ def basic(ctx, operation, intel_targeting, network, commands, skip_discovery, ho
             opplan  = json.load( reader )
             logger.info( f"read operational plan {operation}" )
             d.set_operation_plan( opplan )
-    except:
-        logger.error( "unable to load this opplan?" )
+    except Exception as e:
+        logger.error( f"unable to load opplan {path_to_opplan}?" )
+        logger.error( e )
         sys.exit( -1 )
     try:
         d.run( )

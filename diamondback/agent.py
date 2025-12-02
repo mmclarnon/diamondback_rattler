@@ -449,6 +449,11 @@ class Diamondback( Client ):
     def perform_initial_planning( self ):
         self.logger.info( 'perform initial startup steps...' )
 
+        self.logger.info( "create pwncat local manager" )
+        self.manager      = Manager()
+        self.manager.load_modules( )
+        self.manager.create_db_session( )  
+
         my_ip_info = self.query_public_ip_info()
         self.my_location = None
         try:
@@ -547,11 +552,6 @@ class Diamondback( Client ):
 
     def run( self ):
         self.logger.info( 'agent run() started' )
-
-        self.logger.info( "create pwncat local manager" )
-        self.manager      = Manager()
-        self.manager.load_modules( )
-        self.manager.create_db_session( )        
 
         def check_for_updated_configuration():
             self.logger.info( 'checking configuration for any updates....' )
