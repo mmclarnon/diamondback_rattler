@@ -326,7 +326,7 @@ class Action:
         self.logger.info( f"opening connection of type {self.connection_type}" )
         if self.connection_type.lower() == "ssh":
             self.connection = SSHConnection( self.get_input(), self.username, self.password, self.key ).open()
-        elif self.connection_type.lower == "winrm":
+        elif self.connection_type.lower() == "winrm":
             self.connection = WinRMConnection( self.get_input(), self.username, self.password ).open( )
         elif self.connection_type.lower() == "socat_reverse":
             self.connection = SocatReverseShellConnection( self.get_input(), self.username, self.password, self.port ).open()

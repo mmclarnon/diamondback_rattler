@@ -1,0 +1,15 @@
+{
+    "name" : "winrm_test",
+    "serial": 11248585048,
+    "actions": [
+        { "name":"Sleep", "input":10 },
+        {
+            "name": "hit_each",
+            "loop": true,
+            "target": "host",
+            "actions": [
+                { "name":"ExecuteCommand", "command":"tasklist", "connection":"winrm" }
+            ]
+        }
+    ]
+}

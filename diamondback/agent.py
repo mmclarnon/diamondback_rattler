@@ -58,12 +58,15 @@ class Client:
         self.use_targeting      = False
         self.my_location        = None
         self.current_victim     = None
+
+        self.targets            = []
+        
         if hosts:
-            self.set_hosts( hosts.split(",") )
+            self.set_hosts( list(hosts) )
         else:
             self.set_hosts( [] )
 
-        self.targets = {}
+            self.targets = {}
 
         if network:
             logging.info( f'set network address to {network}' )

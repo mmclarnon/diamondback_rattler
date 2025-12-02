@@ -18,14 +18,25 @@ class WinRMConnection( Connection ):
         self.set_port( port )
 
     def execute(self,command,sudo=False):
-        return self.client.execute(command,sudo)
+        command_parts = command.split(" ")
+        return self.client.run_cmd(command_parts[0], command_parts[1:] )
 
     def open( self ):
         ct = self.get_connection_type( )
         t = self.get_target()
         try:
-            self.logger.info( f'opening {ct} connection to {t}' )
-            self.client = winrm.Session(self.get_target(), auth=(self.get_username(),self.get_password()))
+            self.logger.info( f'opening {ct} connection to {t} as {self.get_username()}' )
+            #self.client = winrm.Session(self.get_target(), auth=(self.get_username(),self.get_password()))
+            
+            # Configure the WinRM session for HTTPS on port 5986
+            self.client = winrm.Session(
+                f'http://{self.get_target()}:{self.get_port()}/wsman',  # Endpoint URL with HTTPS and port 5986
+                auth=(self.get_username(), self.get_password()),
+                transport='basic',  # Or 'kerberos', 'credssp', 'certificate'
+                server_cert_validation='ignore' # Use with caution, or configure trusted CA
+            )
+
+            self.logger.info( 'opened' )
             self.connection_state = ConnectionState.CONNECTED
         except:
             tb = traceback.format_exc()

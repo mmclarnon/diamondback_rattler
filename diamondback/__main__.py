@@ -283,6 +283,7 @@ def basic(ctx, operation, intel_targeting, network, commands, skip_discovery, ho
         sys.exit(1)
     except Exception as e:
         click.echo(f"\n❌ Unexpected error: {str(e)}", err=True)
+        logger.error( traceback.format_exc() )
         sys.exit(1)
 
 @diamondback_client.command(help="Find targets for attack")
