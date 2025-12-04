@@ -19,8 +19,9 @@ class WinRMConnection( Connection ):
 
     def execute(self,command,sudo=False):
         command_parts = command.split(" ")
-        return self.client.run_cmd(command_parts[0], command_parts[1:] )
-
+        response = self.client.run_cmd(command_parts[0], command_parts[1:] )
+        return response.std_out.decode("utf-8")
+    
     def open( self ):
         ct = self.get_connection_type( )
         t = self.get_target()

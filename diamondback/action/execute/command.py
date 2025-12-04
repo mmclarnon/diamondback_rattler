@@ -40,13 +40,12 @@ class ExecuteCommand( Action ):
             username: username
             password: password
         """
-        self.logger.info(f"[Process {multiprocessing.current_process().pid}] "
-                f"Connecting to {self.get_input()}")
+        self.logger.info(f"[Process {multiprocessing.current_process().pid}] Connecting to {self.get_input()}")
         host = self.get_input()
         try:
-            self.logger.info(f"[{host}] Successfully connected, executing: {self.command}")
+            self.logger.info(f"[{host}] Successfully connected, executing: '{self.command}'")
 
-            c = self.lookup_command( self.command, 'ssh' )
+            c = self.lookup_command( self.command, self.get_connection_type() )
             if not c:
                 new_command         = Command( )
                 new_command.service = self.get_connection_type()
@@ -57,11 +56,14 @@ class ExecuteCommand( Action ):
                 self.session.commit( )
 
             r = self.get_connection().execute( self.command, sudo=self.sudo )
-            self.logger.info( 'execution completed...' )
-            if r['out']:
-                self.logger.info(f"[{host}] Output:{r['out'][:200]}")  # Limit output length
-            if r['err']:
-                self.logger.error(f"[{host}] Error: {r['err']}")
+            self.logger.info( f'execution completed--->{r}' )
+            if 'out' in r:
+                if r['out']:
+                    self.logger.info(f"[{host}] Output:{r['out'][:200]}")  # Limit output length
+                if r['err']:
+                    self.logger.error(f"[{host}] Error: {r['err']}")
+            else:
+                self.logger.info( f"{r[:200]}" )  # Limit output length
         except Exception as e:
             self.logger.error(f"[{host}] Error: {str(e)}")
 
