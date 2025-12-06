@@ -48,19 +48,18 @@ class WMIEXEC:
             self.__lmhash, self.__nthash = hashes.split(':')
 
         self.logger = logging.getLogger( 'wmiexec' )
-        print( self.__dict__ )
 
     def set_command( self, command ):
         self.__command = command
+        self.logger.info( self.__command )
 
     def get_output( self ):
-        return self.shell.get_output( )
+        return self.shell.get_final_output( )
 
     def run( self, addr, silentCommand=False ):
-        print( 'trace' )
         if self.__noOutput is False and silentCommand is False:
+            self.logger.info( 'creating SMConnection' )
             smbConnection = SMBConnection(addr, self.__remoteHost)
-            print('connected')
             if self.__doKerberos is False:
                 smbConnection.login(self.__username, self.__password, self.__domain, self.__lmhash, self.__nthash)
                 self.logger.info( 'smbConnection login' )
@@ -79,6 +78,7 @@ class WMIEXEC:
                 self.logger.info("SMBv3.0 dialect used")
         else:
             smbConnection = None
+            self.logger.info( 'no smb connection' )
 
         dcom = DCOMConnection(addr, self.__username, self.__password, self.__domain, self.__lmhash, self.__nthash,
                               self.__aesKey, oxidResolver=True, doKerberos=self.__doKerberos, kdcHost=self.__kdcHost, remoteHost=self.__remoteHost)
@@ -88,8 +88,10 @@ class WMIEXEC:
             iWbemServices = iWbemLevel1Login.NTLMLogin('//./root/cimv2', NULL, NULL)
             iWbemLevel1Login.RemRelease()
             win32Process, _ = iWbemServices.GetObject('Win32_Process')
+            self.logger.info( 'DComConnection established...' )
 
             self.shell = RemoteShell(self.__share, win32Process, smbConnection, self.__shell_type, silentCommand)
+            self.logger.info( 'created remote shell' )
             if self.__command != ' ':
                 self.shell.onecmd(self.__command)
             else:
@@ -136,6 +138,9 @@ class RemoteShell( cmd.Cmd ):
         # If the user wants to just execute a command without cmd.exe, set raw command and set no output
         if self.__silentCommand is True:
             self.__shell = ''
+
+    def get_final_output( self ):
+        return self.__outputBuffer
 
     def do_shell(self, s):
         os.system(s)
@@ -211,7 +216,6 @@ class RemoteShell( cmd.Cmd ):
     def do_cd(self, s):
         self.execute_remote('cd ' + s)
         if len(self.__outputBuffer.strip('\r\n')) > 0:
-            print(self.__outputBuffer)
             self.__outputBuffer = ''
         else:
             self.__pwd = ntpath.normpath(ntpath.join(self.__pwd, s))
@@ -229,7 +233,6 @@ class RemoteShell( cmd.Cmd ):
             self.execute_remote(line)
             if len(self.__outputBuffer.strip('\r\n')) > 0:
                 # Something went wrong
-                print(self.__outputBuffer)
                 self.__outputBuffer = ''
             else:
                 # Drive valid, now we should get the current path
@@ -242,14 +245,16 @@ class RemoteShell( cmd.Cmd ):
             if line != '':
                 self.send_data(line)
 
-    def get_output(self):
+    def get_output( self ):
         def output_callback(data):
             try:
+                print( data )
                 self.__outputBuffer += data.decode(CODEC)
             except UnicodeDecodeError:
                 logging.error('Decoding error detected, consider running chcp.com at the target,\nmap the result with '
                               'https://docs.python.org/3/library/codecs.html#standard-encodings\nand then execute wmiexec.py '
                               'again with -codec and the corresponding codec')
+                print( data )
                 self.__outputBuffer += data.decode(CODEC, errors='replace')
 
         if self.__noOutput is True:
@@ -258,6 +263,7 @@ class RemoteShell( cmd.Cmd ):
 
         while True:
             try:
+                print( f"\\{self.__share}\{self.__output}" )
                 self.__transferClient.getFile(self.__share, self.__output, output_callback)
                 break
             except Exception as e:
@@ -273,7 +279,6 @@ class RemoteShell( cmd.Cmd ):
         self.__transferClient.deleteFile(self.__share, self.__output)
 
     def execute_remote(self, data, shell_type='cmd'):
-        print('execute_remote')
         if shell_type == 'powershell':
             data = '$ProgressPreference="SilentlyContinue";' + data
             data = self.__pwsh + b64encode(data.encode('utf-16le')).decode()
@@ -283,6 +288,7 @@ class RemoteShell( cmd.Cmd ):
         if self.__noOutput is False:
             command += ' 1> ' + '\\\\127.0.0.1\\%s' % self.__share + self.__output + ' 2>&1'
         response = self.__win32Process.Create(command, self.__pwd, None)
+
         if self.__noOutput is False:
             self.get_output()
         else:
@@ -290,7 +296,6 @@ class RemoteShell( cmd.Cmd ):
 
     def send_data(self, data):
         self.execute_remote(data, self.__shell_type)
-        print(self.__outputBuffer)
         self.__outputBuffer = ''
 
 class AuthFileSyntaxError(Exception):
@@ -351,9 +356,9 @@ class WMIConnection( Connection ):
     def execute( self, command, sudo=False ):
         self.logger.info( "execute() started" )
         self.executer.set_command( command )
-        self.logger.info( 'run( )' )
-        self.executer.run(self.get_target(), True )
-        self.logger.info( "execute() complete" )
+        self.logger.debug( 'run( )' )
+        self.executer.run(self.get_target(), False )
+        self.logger.debug( "execute() complete" )
         return self.executer.get_output( )
 
     def open( self ):
@@ -362,14 +367,14 @@ class WMIConnection( Connection ):
         try:
             self.logger.info( f'opening {ct} connection to {t} as {self.get_username()}' )
 
-            command = None 
+            command = ' ' 
             username = self.get_username()
             password = self.get_password()
             domain = '' 
             hashes = None 
             aesKey = None
-            share = None
-            nooutput = True
+            share = 'ADMIN$'
+            nooutput = False
             k = False
             dc_ip = ""
             target_ip = t 

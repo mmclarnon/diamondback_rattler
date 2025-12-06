@@ -8,7 +8,9 @@
             "loop": true,
             "target": "host",
             "actions": [
-                { "name":"ExecuteCommand", "command":"tasklist", "connection":"wmi" }
+                { "name":"ExecuteCommand", "command":"tasklist.exe", "connection":"wmi" },
+                { "name":"ExecuteCommand", "command":"tasklist.exe", "connection":"winrm" }
+
             ]
         }
     ]
