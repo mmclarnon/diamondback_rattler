@@ -51,6 +51,12 @@ class Connection(ABC):
 
     def get_client( self ):
         return self.client
+    
+    def put_file( self, local_path=None, remote_path=None ):
+        raise NotImplementedError( )
+    
+    def get_file( self, remote_path=None, local_path=None ):
+        raise NotImplementedError( )
 
     def set_target( self, target ):
         self.target = target

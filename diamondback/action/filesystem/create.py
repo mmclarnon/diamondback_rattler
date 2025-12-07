@@ -79,3 +79,10 @@ class FileSystemWrite( Action ):
                                            self.remote_file) 
                     else:
                         self.logger.warning( "skipping copy of local file to remote system, file does not exist?" )
+            elif self.get_connection_type().lower() == "smb":
+                self.logger.info( 'copy local file to remote path via SMB' )
+                smb_client = self.get_connection()
+                smb_client.put_file( self.variables['local_file'], self.remote_file )
+                self.get_connection().close( )
+        else:
+            self.logger.warning( f"not connected to target via {self.get_connection_type()}" )

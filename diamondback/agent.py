@@ -728,5 +728,7 @@ class Diamondback( Client ):
                 if i:
                     try:
                         i.get_connection().close( )
+                        self.logger.info( 'trace' )
                     except:
                         self.logger.warning( f'failed to close a connection on {i.get_name()}' )
+            self.logger.info( 'complete' )

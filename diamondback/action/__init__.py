@@ -15,6 +15,7 @@ from diamondback.connection.winrm import WinRMConnection
 from diamondback.connection.reverse.shell import SocatReverseShellConnection
 from diamondback.connection.wmi import WMIConnection
 from diamondback.connection.pwncat import PwncatConnection
+from diamondback.connection.smbc import SMBConnection as DiamondbackSMBConnection
 from diamondback.support import *
 from diamondback.domain import *
 
@@ -329,6 +330,8 @@ class Action:
             self.connection = SSHConnection( self.get_input(), self.username, self.password, self.key ).open()
         elif self.connection_type.lower() == "winrm":
             self.connection = WinRMConnection( self.get_input(), self.username, self.password ).open( )
+        elif self.connection_type.lower() == "smb":
+            self.connection = DiamondbackSMBConnection( self.get_input(), self.username, self.password ).open( )
         elif self.connection_type.lower() == "wmi":
             self.connection = WMIConnection( self.get_input(), self.username, self.password ).open( )            
         elif self.connection_type.lower() == "socat_reverse":

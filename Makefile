@@ -27,15 +27,14 @@ APPNAME = diamondback
 CONFIGURATION_FILE = configuration.json
 CONFIGURATION_SAMPLE = $(CONFIGURATION_FILE).sample
 SRCDIR = src
-REQUIRED_PACKAGES = 	python$(PYTHON_VERSION)-venv \
-			python$(PYTHON_VERSION)-dev \
-			python3-ansible-runner \
+REQUIRED_PACKAGES =  python3-ansible-runner \
 			libportaudio2 \
 			portaudio19-dev \
 			socat 
 # UNIX-based OS variables & settings
 RM = /bin/rm
-
+PYTHON = /home/parallels/workspace/.pyenv/shims/python3
+VENV = /home/parallels/workspace/.pyenv/shims/python3 -m venv
 METASPLOIT_IMAGE_NAME = diamondback_metasploit
 TAG = latest
 VERSION_FILE := ./VERSION.txt

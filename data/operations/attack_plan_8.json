@@ -1,0 +1,15 @@
+{
+    "name" : "winrm_test",
+    "serial": 11248585048,
+    "actions": [
+        { "name":"Sleep", "input":10 },
+        {
+            "name": "hit_each",
+            "loop": true,
+            "target": "host",
+            "actions": [
+                { "name":"FileSystemWrite", "connection":"smb", "remote_file":"c:\\temp\\this_is_malware.txt", "local_file":"/tmp/test.txt"}
+            ]
+        }
+    ]
+}
