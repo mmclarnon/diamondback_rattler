@@ -1,0 +1,16 @@
+{
+    "name" : "multi_connection_test",
+    "serial": 11248585048,
+    "actions": [
+        { "name":"ICMPScan", "timeout":5, "update_host":true, "skip": false },
+        { 
+            "name": "hit_each",
+            "loop": true,
+            "target": "host",
+            "actions": [
+                { "name":"SMBConnectionAttempt" },
+                { "name":"SSHConnectionAttempt" }                
+            ]
+        }
+    ]
+}

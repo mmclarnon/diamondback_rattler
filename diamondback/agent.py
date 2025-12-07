@@ -604,16 +604,37 @@ class Diamondback( Client ):
                                 targets = self.get_hosts()
                             elif a["target"].lower() == "target":
                                 targets = self.get_targets()
-                            
+                        os_filter = None  
+                        override_username = None                          
                         for t in targets:
+                            os_filter = None
+                            override_username = None
+                            if "workswith" in a:
+                                self.logger.info( f"user specified target filter for this loop-->{a['workswith']}" )
+                                os_filter = a['workswith']
+
+                            if "override_user" in a:
+                                override_username = a["override_user"]
+
                             if t not in self.special_values:
                                 self.logger.info( f'save a table of dynamic values for {t}' )
                                 self.special_values[t] = {}
                             if t not in self.hosts_to_ignore:
                                 self.logger.info( f'examining potential target {t}' )
+                                if os_filter:
+                                    self.logger.info( 'lookup OS details on the target' )
+                                    target_obj = self.lookup_host_by_address(t)
+                                    if target_obj:
+                                        self.logger.info( 'found a target' )
+                                        if target_obj.os and target_obj.os.lower() != os_filter:
+                                            self.logger.info( 'skip this target it doesnt match the workswith filter...' )
+                                            continue
+                                        
                                 for la_orig in loop_actions:
                                     la = copy.deepcopy( la_orig )
                                     la["input"] = t
+                                    if override_username:
+                                        la["username"] = override_username
 
                                     for (key,value) in la.items():
                                         if type(value) == str and value.find("random") != -1 and value.find("random}") == -1:
@@ -641,7 +662,7 @@ class Diamondback( Client ):
                                         elif type(value) == str and value.find("replace") != -1:
                                             self.logger.info( f'found replace marker in {value}' )
                                             replace_with = parse_string_parameter( value, "replace" )
-                                            substring = "{replace:%s}" % str(replace_with)
+                                            substring    = "{replace:%s}" % str(replace_with)
 
                                             self.logger.info( f'replace the following substring:{substring}')
                                             special_key = f"{replace_with}"
@@ -670,7 +691,6 @@ class Diamondback( Client ):
                                             la[key] = value
 
                                     argument_table = arguments | la
-
                                     if la['name'] == "DirectExecute":
                                         try:
                                             self.logger.info('execute a direct action using a previous action connection')

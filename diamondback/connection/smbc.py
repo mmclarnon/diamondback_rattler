@@ -142,7 +142,6 @@ class SMBConnection( Connection ):
             self.connection_state = ConnectionState.CONNECTED
         except:
             tb = traceback.format_exc()
-            self.logger.error( tb )
             self.get_errors().append( tb )
             self.logger.error( 'ERROR: unable to open connection? check error logs' )
             self.connection_state = ConnectionState.ERROR

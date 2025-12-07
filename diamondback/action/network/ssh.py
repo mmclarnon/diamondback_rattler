@@ -16,7 +16,7 @@ class SSHConnectionAttempt( Action ):
         u = self.username
         self.logger.info( f'using supplied target of {i}, username of {u}, password of {p}' )
     
-    def check_ssh_access(self, port=22, timeout=3):
+    def check_ssh_access( self, port=22, timeout=3 ):
         """
         Check if SSH access is available with given credentials.
         
@@ -35,9 +35,10 @@ class SSHConnectionAttempt( Action ):
             client = paramiko.SSHClient()
             client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             
+            self.logger.info( f'connect to {self.get_input()} using SSH, {type(self.get_input())}' )
             # Attempt connection
             client.connect(
-                hostname=self.get_input( ),
+                hostname=str(self.get_input()),
                 port=port,
                 username=self.username,
                 password=self.password,
@@ -63,18 +64,18 @@ class SSHConnectionAttempt( Action ):
         self.logger.info( 'starting ssh connection attempt action' )
         
         self.set_output( self.check_ssh_access() )
-        if self.does_host_exist(self.get_input()):
-            host_record = self.lookup_host_by_address( self.get_input() )
+        if self.does_host_exist(str(self.get_input())):
+            host_record = self.lookup_host_by_address( str(self.get_input()) )
         else:
-            self.logger.info( f'host record did not exist, save new one for {self.get_input()}' )
+            self.logger.info( f'host record did not exist, save new one for {str(self.get_input())}' )
             host_record         = Target( )
-            host_record.address = self.get_input( )
-
+            host_record.address = str(self.get_input( ))
+            host_record.os      = 'linux'
 
         if self.get_output( ):
             self.logger.info( 'this host has ACTIVE ssh...' )
+            host_record.discovery_method = 'ssh'
             self.get_session().add( host_record )
-            self.get_session().commit( )
 
             ssh_banner = self.banner
 
@@ -85,12 +86,12 @@ class SSHConnectionAttempt( Action ):
             ssh_service.banner   = ssh_banner
 
             self.session.add( ssh_service )
-            self.session.commit()
-            self.speak_text( f'connected to {self.get_input()} using SSH')
+            self.speak_text( f'connected to {str(self.get_input())} using SSH')
 
             self.captured_target = host_record
         else:
             self.logger.info( 'this host does not have active SSH' )
+        self.get_session().commit( )
 
         self.logger.info( 'ssh connection attempt action completed....' )
         return self

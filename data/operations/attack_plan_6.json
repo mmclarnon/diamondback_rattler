@@ -10,6 +10,7 @@
             "name": "hit_each",
             "loop": true,
             "target": "target",
+            "workswith": "linux",
             "actions": [
                             { "name":"FileSystemWrite", "connection":"ssh", "remote_file":"/home/sysadmin/this_is_malware", "local_file":"/home/sysadmin/workspace/diamondback_rattler/docker/payloads/meterpreter-linux"}
                         ]

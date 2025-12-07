@@ -74,6 +74,7 @@ class Target( Versioned, Base ):
     hardware_address = mapped_column( String, default=None, nullable=True )
     cpe              = mapped_column( String, default=None, nullable=True )
     discovery_method = mapped_column( String, default=None, nullable=True )
+    os               = mapped_column( String, default=None, nullable=True )
     connection       = mapped_column( String, default=None, nullable=True )    
     is_encoded       = mapped_column( Boolean, default=False )
     note             = mapped_column( Text, nullable=True, default=None )
@@ -82,6 +83,9 @@ class Target( Versioned, Base ):
     last_updated     = mapped_column( DateTime, nullable=False, server_default=func.now(), onupdate=datetime.datetime.now() )
     victim_id        = Column(Integer, ForeignKey('victim.id'))
     victim           = relationship('Victim', back_populates='targets')
+
+    def __repr__( self ):
+        return self.address
 
     # One-to-Many relationship with TargetService
     # This creates a list of TargetService objects accessible via target.services

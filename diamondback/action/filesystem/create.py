@@ -69,6 +69,7 @@ class FileSystemWrite( Action ):
                         elif self.mode == 'append':
                             self.logger.info( 'append to an existing file!!' )
                             write_to_remote_file( ssh_client, new_filename, self.variables['contents'], True )
+                    self.speak_text( f'delivered file to victim {str(self.get_input())} using SSH')
 
                 if 'local_file' in self.variables and self.variables['local_file']:
                     self.logger.info( self.variables['local_file'] )
@@ -77,12 +78,18 @@ class FileSystemWrite( Action ):
                         sftp_upload_simple(ssh_client, 
                                            self.variables['local_file'] , 
                                            self.remote_file) 
+                        self.speak_text( f'delivered file to victim {str(self.get_input())} using SSH')
+
                     else:
                         self.logger.warning( "skipping copy of local file to remote system, file does not exist?" )
+
+
             elif self.get_connection_type().lower() == "smb":
                 self.logger.info( 'copy local file to remote path via SMB' )
                 smb_client = self.get_connection()
                 smb_client.put_file( self.variables['local_file'], self.remote_file )
                 self.get_connection().close( )
+
+                self.speak_text( f'delivered file to victim {str(self.get_input())} using SMB')
         else:
             self.logger.warning( f"not connected to target via {self.get_connection_type()}" )

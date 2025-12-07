@@ -11,6 +11,7 @@
             "name": "hit_each",
             "loop": true,
             "target": "target",
+            "workswith": "linux",
             "actions": [
                 { "name":"SSHCommandExecution", "skip":true, "commands":"whoami,ps -ef,cat /etc/passwd", "sudo":true },
                 { "name":"InstallPackage", "skip":false, "package":"socat", "sudo":true, "connection":"ssh" },
