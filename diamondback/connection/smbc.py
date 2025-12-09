@@ -82,6 +82,7 @@ class SMBConnection( Connection ):
         self.__silentCommand = False
         self.__pwd = str('C:\\')
         self.__noOutput = True
+        self.__win32Process = None
 
     def execute( self, command, sudo=False, shell_type='cmd' ):
         if shell_type == 'powershell':

@@ -212,7 +212,11 @@ class Diamondback( Client ):
 
         self.my_launch_event = LaunchEvent( )
         self.my_launch_event.current_address = self.get_local_ip_address( )
-        (gateway,interface) = self.get_default_gateway( )
+        try:
+            (gateway,interface) = self.get_default_gateway( )
+        except:
+            raise RuntimeError('Unable to determine gateway? Cannot continue')
+
         self.my_launch_event.network_gateway = gateway
         self.my_launch_event.network_interface = interface
 

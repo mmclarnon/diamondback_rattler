@@ -56,7 +56,9 @@ class SSHClientWrapped:
                                         "id",
                                         "groups"
                                     ]
-        logging.getLogger('sshclient').info( f'calling execute({command}) with sudo={sudo} on {self.host} with password {self.password}' )
+        logging.getLogger('sshclient').info( f'calling execute({command}) with sudo={sudo} on {self.host}' )
+
+        logging.getLogger('sshclient').debug( f'calling execute({command}) with sudo={sudo} on {self.host} with password {self.password}' )
         feed_password = False
         command_altered = False
         if sudo and self.username != "root":

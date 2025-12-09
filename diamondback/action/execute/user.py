@@ -1,5 +1,4 @@
 import logging
-import multiprocessing
 
 from diamondback.domain import Command
 from diamondback.action import call_before_decorator,Action
@@ -42,46 +41,68 @@ class AddUser( Action ):
             if not password:
                 password = self.new_password
 
-            cmd = [
-                '/usr/sbin/useradd',
-                '-m',  # Create home directory
-                '-s', '/bin/bash',  # Set bash as default shell
-                '-G', 'sudo,adm',  # Add to sudo and adm groups
-                #'-c', full_name,  # Full name/comment
-                username
-            ]
+            if self.get_connection().get_connection_type().lower() == "ssh":
+                self.logger.info( 'setup user creation using SSH' )
+
+                cmd = [
+                    '/usr/sbin/useradd',
+                    '-m',  # Create home directory
+                    '-s', '/bin/bash',  # Set bash as default shell
+                    '-G', 'sudo,adm',  # Add to sudo and adm groups
+                    #'-c', full_name,  # Full name/comment
+                    username
+                ]
+            elif self.get_connection().get_connection_type().lower() == "winrm":
+                self.logger.info( 'setup user creation using winrm' )
+                cmd = [
+                    'New-LocalUser',
+                    '-Name', 
+                    username,
+                    '-Password', 
+                    f'(ConvertTo-SecureString "{password}" -AsPlainText -Force)'
+                ]   
+            elif self.get_connection().get_connection_type().lower() == "smb":
+                self.logger.info( 'setup user creation using SMB' )
+
+                cmd = [
+                    'net',
+                    'user', 
+                    username,
+                    password,
+                    '/add'
+                ]  
             self.logger.info( cmd )
             
             self.logger.info(f"Creating user '{username}'...")
             output = self.get_connection().execute(" ".join(cmd), sudo=True)
             self.logger.info(f"User '{username}' created successfully")
-            self.logger.info( output )
+            self.logger.debug( output )
             
             # Set password if provided
-            if password:
+            if password and self.get_connection().get_connection_type().lower() == "ssh":
                 self.logger.info(f"Setting password for '{username}'...")
                 # Use chpasswd to set the password
                 passwd_cmd = f'echo "{username}:{password}" | chpasswd'
                 self.get_connection().execute(passwd_cmd, sudo=True)
                 self.logger.info("Password set successfully")
             
-            # Verify the user was created and show user info
-            self.logger.info("Verifying user creation...")
-            id_output = self.get_connection().execute(f'id {username}', sudo=True)
-            self.logger.info(f"User info: {id_output}")
-            
-            # Show the groups
-            groups_output = self.get_connection().execute(f'groups {username}', sudo=True)
-            self.logger.info(f"Groups: {groups_output}")
+                # Verify the user was created and show user info
+                self.logger.info("Verifying user creation...")
+                id_output = self.get_connection().execute(f'id {username}', sudo=True)
+                self.logger.info(f"User info: {id_output}")
+                
+                # Show the groups
+                groups_output = self.get_connection().execute(f'groups {username}', sudo=True)
+                self.logger.info(f"Groups: {groups_output}")
         
             return True
         except Exception as e:
-            self.logger.error(f"Unexpected error: {e}")
+            self.logger.error( f"Unexpected error: {e}" )
             return False
 
     @call_before_decorator
     def run( self ):
-        self.logger.info(f"\Adding new user on host {self.get_input()}...")
+        self.logger.info(f"adding new user on host {self.get_input()}...")
         
         self.create_user( )
 
@@ -117,18 +138,30 @@ class RemoveUser( Action ):
         try:
             if not username:
                 username = self.new_username 
-
-            cmd = [
-                '/usr/sbin/userdel',
-                username
-            ]
-            self.logger.info( cmd )
-            
+            if self.get_connection().get_connection_type().lower() == "ssh":
+                cmd = [
+                    '/usr/sbin/userdel',
+                    username
+                ]
+                self.logger.info( cmd )
+            elif self.get_connection().get_connection_type().lower() == "winrm":
+                cmd = [
+                    'Remove-LocalUser',
+                    '-Name',
+                    username                    
+                ]   
+            elif self.get_connection().get_connection_type().lower() == "smb":
+                cmd = [
+                    'net',
+                    'user', 
+                    username, 
+                    '/delete',
+                ]              
             self.logger.info(f"Removing user '{username}'...")
             output = self.get_connection().execute(" ".join(cmd), sudo=True)
             self.logger.info(f"User '{username}' REMOVED successfully")
             self.logger.info( output )
-            
+
             return True
         except Exception as e:
             self.logger.error(f"Unexpected error: {e}")

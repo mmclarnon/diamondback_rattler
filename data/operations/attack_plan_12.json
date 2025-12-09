@@ -1,0 +1,28 @@
+{
+    "name" : "multi_action",
+    "serial": 11248585048,
+    "actions": [
+        { "name":"Sleep", "input":3 },
+        {
+            "name": "hit_each",
+            "loop": true,
+            "target": "host",
+            "workswith": "windows",
+            "actions": [
+                { "name":"FileSystemWrite", "connection":"smb", "remote_file":"c:\\temp\\this_is_malware.txt", "local_file":"/tmp/test.txt"},
+                { "name":"AddUser", "skip":false, "connection":"smb", "username_to_add":"baduser", "new_password":"P@ssw0rd1!" }
+            ]
+        },
+        {
+            "name": "hit_each",
+            "loop": true,
+            "target": "host",
+            "workswith": "linux",
+            "override_user": "sysadmin",
+            "actions": [
+                { "name":"FileSystemWrite", "connection":"ssh", "remote_file":"/tmp/this_is_malware", "local_file":"/tmp/test.txt"},
+                { "name":"AddUser", "skip":false, "connection":"ssh", "username_to_add":"baduser", "new_password":"P@ssw0rd1!" }
+            ]
+        }        
+    ]
+}

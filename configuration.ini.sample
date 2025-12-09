@@ -11,9 +11,6 @@ password = 7qogP4xljqTVg+zIGsUAg1DltfXT3l2Df5igfM3VVHzdzwUrSt/kGl4iRbDwH/c/WAG+3
 type = sqlite
 url = diamondback.sqlite
 
-[api]
-status = /api/system/ping
-
 [execution]
 wait = 30
 speak = false
