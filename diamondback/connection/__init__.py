@@ -44,7 +44,7 @@ class Connection(ABC):
         self.connection_type = connection_type
     
     def get_connection_type( self ):
-        return self.connection_type
+        return self.connection_type.lower()
     
     def set_client( self, connection_client ):
         self.client = connection_client
