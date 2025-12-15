@@ -43,7 +43,10 @@ ARCHITECTURE = $(shell dpkg --print-architecture)
 
 
 all: 
+	-@./increment_version.sh
+	-@update-toml update --path project.version --value `cat VERSION.txt` --file pyproject.toml
 	@echo "built"
+	@hatch build
 
 develop: 
 	DEBIAN_FRONTEND=noninteractive sudo apt-get update
@@ -54,6 +57,8 @@ develop:
 	mkdir data 2> /dev/null && cd data && python -m piper.download_voices en_US-amy-medium
 	curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
 	sudo sh /tmp/get-docker.sh 
+	@$(PIP) install hatch==1.16.2
+	@$(PIP) install update_toml==0.2.1
 
 # Builds the app
 $(APPNAME): $(OBJ) 

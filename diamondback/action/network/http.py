@@ -69,6 +69,8 @@ class HTTPGet( Action ):
             command = ["curl", "-L", "-o", local_filename, url]
 
             result = self.get_connection().execute( " ".join(command) )
+
+            self.logger.info( result )
         except FileNotFoundError:
             self.logger.info("Error: curl command not found. Please ensure curl is installed.")
             return False
@@ -207,12 +209,11 @@ class HTTPGet( Action ):
     def run( self ):
         self.logger.info( 'starting HTTP GET action' )
 
-        if self.get_connection().get_connection_type() == "ssh":
+        if self.get_connection().get_connection_type() == "ssh" or self.get_connection().get_connection_type() == "smb":
             self.download_with_curl( self.url, self.local_filename )
         elif self.get_connection().get_connection_type() == "winrm":
             self.download_with_powershell( self.url, self.local_filename )
-        elif self.get_connection().get_connection_type() == "smb":
-            self.download_with_certutil( self.url, self.local_filename )
+
         
         self.logger.info( 'HTTPGet action attempt action completed....' )
         return self

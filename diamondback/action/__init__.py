@@ -325,7 +325,7 @@ class Action:
         return new_target
 
     def open_connection( self ) -> Connection:
-        self.logger.info( f"opening connection of type {self.connection_type}" )
+        self.logger.info( f"opening connection of type '{self.connection_type}'" )
         if self.connection_type.lower() == "ssh":
             self.connection = SSHConnection( self.get_input(), self.username, self.password, self.key ).open()
         elif self.connection_type.lower() == "winrm":

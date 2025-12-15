@@ -13,7 +13,8 @@
                 { "name":"FileSystemWrite", "connection":"smb", "remote_file":"c:\\temp\\this_is_malware.txt", "local_file":"/tmp/test.txt"},
                 { "name":"AddUser", "skip":false, "connection":"smb", "username_to_add":"baduser", "new_password":"P@ssw0rd1!" },
                 { "name":"ExecuteCommand", "command":"tasklist.exe", "connection":"winrm" },
-                { "name":"ExecuteCommand", "command":"Get-Process", "connection":"winrm", "as_powershell": true }                              
+                { "name":"ExecuteCommand", "command":"Get-Process", "connection":"winrm", "as_powershell": true },                              
+                { "name":"HTTPGet", "skip":false, "connection":"winrm", "url":"https://the.earth.li/~sgtatham/putty/latest/w64/putty.exe", "local_file":"C:\\temp\\putty.exe" }
             ]
         },
         {
