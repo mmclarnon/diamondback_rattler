@@ -90,6 +90,10 @@ class Connection(ABC):
     def close(self):
         pass
 
+    @abstractmethod
+    def execute( self, command, sudo=False ):
+        pass
+
 # Option 5: Conditional loading based on environment
 def initialize():
     """

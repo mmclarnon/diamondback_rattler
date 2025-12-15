@@ -17,11 +17,16 @@ class WinRMConnection( Connection ):
         self.set_connection_type( 'winrm' )
         self.set_port( port )
 
-    def execute(self,command,sudo=False):
+    def execute( self, command, sudo=False ):
+        self.logger.info( command )
         command_parts = command.split(" ")
         response = self.client.run_cmd(command_parts[0], command_parts[1:] )
         return response.std_out.decode("utf-8")
     
+    def run_powershell( self, command, sudo=False ):
+        response = self.client.run_ps( command )
+        return response.std_out.decode("utf-8")
+
     def open( self ):
         ct = self.get_connection_type( )
         t = self.get_target()
@@ -58,15 +63,6 @@ class WinRMConnection( Connection ):
     def __del__( self ):
         self.logger.info( 'connection deconstructor firing..' )
         if self.connection_state != ConnectionState.CLOSED:
-            try:
-                if self.get_client():
-                    self.logger.info( 'calling paramiko specific close() now' )
-                    self.get_client().close( )
-
-                if self.transport:
-                    self.transport.close( )
-            except:
-                self.logger.warning( 'quietly handling exception closing paramiko connection' )
 
             self.connection_state = ConnectionState.CLOSED
             self.logger.info( 'marking connection as closed.' )

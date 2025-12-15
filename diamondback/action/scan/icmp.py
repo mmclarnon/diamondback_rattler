@@ -25,7 +25,7 @@ class ICMPScan( Action ):
             i = self.get_input( )
             self.network = ipaddress.ip_network(i, strict=False)
         except:
-            self.logger.warning( f"woah careful, this is not a valid network? {i}" )
+            self.logger.warning( f"woah careful, this is not a valid network-->{i}" )
 
         if "network" in kwargs and kwargs["network"]:
             if type(kwargs["network"]) == str:
@@ -81,6 +81,11 @@ class ICMPScan( Action ):
         Returns:
             list: List of IP addresses that responded to ping
         """
+        if not self.network:
+            self.logger.warning( 'no network address has been specified, I cannot actually PING anything!' )
+            self.set_output( [] )
+            return
+
         self.logger.info(f"[*] Starting ICMP scan on {self.network}")
         self.logger.info(f"[*] Total hosts to scan: {self.network.num_addresses}")
         self.logger.info(f"[*] Timeout: {self.timeout}s per host")

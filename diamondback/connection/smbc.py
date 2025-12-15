@@ -125,7 +125,7 @@ class SMBConnection( Connection ):
             smbConnection.setTimeout(100000)
             self.dcom = dcom
             shares = smbConnection.listShares()
-            self.logger.info(f"Found {len(shares)} shares:")
+            self.logger.info(f"Found {len(shares)} shares")
             self.iWbemLevel1Login = iWbemLevel1Login
 
             self.do_cd('\\')
@@ -248,7 +248,7 @@ class SMBConnection( Connection ):
         if self.connection_state != ConnectionState.CLOSED:
             try:
                 if self.get_client():
-                    self.logger.info( 'calling paramiko specific close() now' )
+                    self.logger.info( 'calling impacket specific close() now' )
                     self.get_client().close( )
                     self.dcom.disconnect( )
                     try:
@@ -256,7 +256,7 @@ class SMBConnection( Connection ):
                     except:
                         pass
             except:
-                self.logger.warning( 'quietly handling exception closing paramiko connection' )
+                self.logger.warning( 'quietly handling exception closing impacket connection' )
 
             self.connection_state = ConnectionState.CLOSED
             self.logger.info( 'marking connection as closed.' )

@@ -65,8 +65,11 @@ class Client:
             self.set_hosts( list(hosts) )
         else:
             self.set_hosts( [] )
+            self.set_targets( [] )
 
-            self.targets = {}
+        if self.context and 'TARGET' in self.context.obj:
+            self.get_targets().append( self.context.obj['TARGET'] )
+            self.logger.info( f'append {self.context.obj["TARGET"]} to target set' )
 
         if network:
             logging.info( f'set network address to {network}' )
@@ -609,13 +612,20 @@ class Diamondback( Client ):
                             elif a["target"].lower() == "target":
                                 targets = self.get_targets()
                         os_filter = None  
-                        override_username = None                          
+                        override_username = None    
+                        override_password = None
+                        self.logger.info( f'currently focused on targets--->{targets}' )
+                        
                         for t in targets:
                             os_filter = None
                             override_username = None
+                            override_password = None
                             if "workswith" in a:
                                 self.logger.info( f"user specified target filter for this loop-->{a['workswith']}" )
                                 os_filter = a['workswith']
+
+                            if "override_password" in a:
+                                override_password = a["override_password"]
 
                             if "override_user" in a:
                                 override_username = a["override_user"]
@@ -639,6 +649,9 @@ class Diamondback( Client ):
                                     la["input"] = t
                                     if override_username:
                                         la["username"] = override_username
+
+                                    if override_password:
+                                        la["password"] = override_password
 
                                     for (key,value) in la.items():
                                         if type(value) == str and value.find("random") != -1 and value.find("random}") == -1:
@@ -712,6 +725,7 @@ class Diamondback( Client ):
                                             self.logger.info("opplan has configured skipping this action")
                                             time.sleep( 10 )
                                         else:
+                                            self.logger.info( 'executing action....' )
                                             next_action.run( )
                                             if next_action.should_register():
                                                 registered_objects[next_action.get_registration_key()] = next_action

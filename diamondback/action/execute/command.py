@@ -26,6 +26,11 @@ class ExecuteCommand( Action ):
 
             self.command = self.original_command.format( **variables )
 
+        if 'as_powershell' in kwargs:
+            self.run_as_powershell = kwargs['as_powershell']
+        else:
+            self.run_as_powershell = False
+
         if 'background' in kwargs and kwargs['background']:
             if not self.command.endswith( "&" ):
                 self.logger.info( 'appending ampersand "&" character to force command to background' )
@@ -55,7 +60,14 @@ class ExecuteCommand( Action ):
                 self.session.add( new_command )
                 self.session.commit( )
 
-            r = self.get_connection().execute( self.command, sudo=self.sudo )
+            if self.get_connection().get_connection_type() != "winrm":
+                r = self.get_connection().execute( self.command, sudo=self.sudo )
+            else:
+                if self.run_as_powershell:
+                    r = self.get_connection().run_powershell( self.command )
+                else:
+                    r = self.get_connection().execute( self.command, sudo=self.sudo )
+                    
             self.logger.info( f'execution completed--->{r}' )
             if 'out' in r:
                 if r['out']:

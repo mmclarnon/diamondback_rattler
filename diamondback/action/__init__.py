@@ -189,7 +189,7 @@ class Action:
                 l = j.strip('\t')
                 self.network_services[k] = l
 
-    def get_local_ip_address( self ):
+    def get_local_ip_address( self ) -> str:
         """
         Retrieves the local network IP address of the current machine.
         """
@@ -206,10 +206,10 @@ class Action:
             self.logger.info(f"Error getting local IP address: {e}")
             return None
 
-    def should_register( self ):
+    def should_register( self ) -> bool:
         return self.registration_key is not None
 
-    def get_registration_key( self ):
+    def get_registration_key( self ) -> str:
         return self.registration_key
 
     def should_skip( self ) -> bool:
@@ -324,7 +324,7 @@ class Action:
         self.session.commit( )
         return new_target
 
-    def open_connection( self ):
+    def open_connection( self ) -> Connection:
         self.logger.info( f"opening connection of type {self.connection_type}" )
         if self.connection_type.lower() == "ssh":
             self.connection = SSHConnection( self.get_input(), self.username, self.password, self.key ).open()
@@ -338,4 +338,7 @@ class Action:
             self.connection = SocatReverseShellConnection( self.get_input(), self.username, self.password, self.port ).open()
         elif self.connection_type.lower() == "pwncat":
             self.connection = PwncatConnection( self.get_input(), self.username, self.password, self.key ).open( )         
+        return self.connection
+    
+    def get_connection( self ) -> Connection:
         return self.connection
