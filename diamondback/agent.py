@@ -706,7 +706,12 @@ class Diamondback( Client ):
                                             value = value.replace( substring,str(self.special_values[special_key]) )
                                             self.logger.info( f'replaced with {value}')
                                             la[key] = value
-
+                                        elif type(value) == str and value.find( "{user}" ) != -1 or type(value) == str and value.find( "{username}" ) != -1:
+                                            self.logger.info( "found a template variable to replace?" )
+                                            value = value.replace( "{user}", arguments["username"] )
+                                            self.logger.info( value )
+                                            la[key] = value
+                                            
                                     argument_table = arguments | la
                                     if la['name'] == "DirectExecute":
                                         try:

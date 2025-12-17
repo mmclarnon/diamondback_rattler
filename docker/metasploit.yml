@@ -9,7 +9,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - /home/sysadmin/workspace/diamondback_rattler/docker/pgdata:/var/lib/postgresql/data
+      - /home/${SUDO_USER:-sysadmin}/workspace/diamondback_rattler/docker/pgdata:/var/lib/postgresql/data
 
   metasploit:
     image: metasploitframework/metasploit-framework:latest
@@ -29,5 +29,5 @@ services:
               -p 55553
               -S
     volumes:
-      - /home/sysadmin/workspace/diamondback_rattler/docker/data:/root/.msf4
-      - /home/sysadmin/workspace/diamondback_rattler/docker/payloads:/payloads
+      - /home/${SUDO_USER:-sysadmin}/workspace/diamondback_rattler/docker/data:/root/.msf4
+      - /home/${SUDO_USER:-sysadmin}/workspace/diamondback_rattler/docker/payloads:/payloads

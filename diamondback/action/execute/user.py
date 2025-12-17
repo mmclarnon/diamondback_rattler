@@ -1,4 +1,5 @@
 import logging
+import traceback
 
 from diamondback.domain import Command
 from diamondback.action import call_before_decorator,Action
@@ -98,6 +99,7 @@ class AddUser( Action ):
             return True
         except Exception as e:
             self.logger.error( f"Unexpected error: {e}" )
+            self.logger.error( traceback.format_exc() )
             return False
 
     @call_before_decorator

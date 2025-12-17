@@ -5,7 +5,9 @@ import subprocess
 from diamondback.action import call_before_decorator,Action,CURRENT_DIRECTORY
 from diamondback.support import delete_all_files
 
-PATH_TO_MSFVENOM = "/usr/src/metasploit-framework/msfvenom"
+PATH_TO_MSFVENOM  = "/usr/src/metasploit-framework/msfvenom"
+CURRENT_DIRECTORY = os.path.abspath( os.path.dirname(__file__) )
+PROJECT_ROOT      = os.path.dirname( os.path.dirname(os.path.dirname(CURRENT_DIRECTORY)) )
 
 class MSFVenom( Action ):
     def __init__(self, *args, **kwargs):
@@ -39,6 +41,13 @@ class MSFVenom( Action ):
         # Validate required args
         if not self.payload or not self.lhost or not self.lport:
             raise ValueError("Missing required arguments: payload, lhost, lport")
+        
+        path_to_payloads = os.path.join( PROJECT_ROOT, "docker", "payloads" )
+        if not os.path.exists( path_to_payloads ):
+            self.logger.info( f"create payload output directory--->{path_to_payloads}" )
+            os.makedirs( path_to_payloads )
+        else:
+            self.logger.info( f"paylod directory {path_to_payloads} already exists" )
 
     def run( self ):
         # Build msfvenom command inside docker exec

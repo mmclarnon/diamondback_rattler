@@ -9,6 +9,7 @@ __pycache__/
 *.toc
 
 **/docker/data/*
+**/docker/payloads/*
 **/diamondback.log*
 **/*.iso
 **/*.sqlite

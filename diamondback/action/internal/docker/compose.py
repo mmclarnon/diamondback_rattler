@@ -26,7 +26,6 @@ class DockerComposeBot:
 
         # Perform environment variable substitution like ${VAR}
         substituted_content = self._substitute_env_vars(raw_content)
-
         # Parse YAML after substitution
         self.compose_config = yaml.safe_load(substituted_content)
 

