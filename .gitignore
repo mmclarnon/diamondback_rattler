@@ -8,6 +8,7 @@ __pycache__/
 *.pyz
 *.toc
 
+**/docker/pgdata/*
 **/docker/data/*
 **/docker/payloads/*
 **/diamondback.log*

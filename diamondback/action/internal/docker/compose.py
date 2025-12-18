@@ -17,6 +17,9 @@ class DockerComposeBot:
         self.compose_file = compose_file
         self.client = docker.from_env()
 
+        if not self.is_docker_installed( ):
+            raise RuntimeError("Docker not installed? Cannot run this action!!!")
+
         # Load environment variables from .env file if present
         if os.path.exists(env_file):
             self._load_env_file(env_file)
@@ -28,6 +31,13 @@ class DockerComposeBot:
         substituted_content = self._substitute_env_vars(raw_content)
         # Parse YAML after substitution
         self.compose_config = yaml.safe_load(substituted_content)
+
+    def is_docker_installed( self ) -> bool: 
+        try: # Run 'docker --version' and suppress output 
+            subprocess.run( ["docker", "--version"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True ) 
+            return True 
+        except (subprocess.CalledProcessError, FileNotFoundError): 
+            return False
 
     def _load_env_file(self, env_file):
         """Load variables from a .env file into os.environ"""

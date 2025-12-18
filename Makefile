@@ -30,7 +30,8 @@ SRCDIR = src
 REQUIRED_PACKAGES =  python3-ansible-runner \
 			libportaudio2 \
 			portaudio19-dev \
-			socat 
+			socat \
+			gcc-mingw-w64-x86-64-win32
 # UNIX-based OS variables & settings
 RM = /bin/rm
 PYTHON = /home/parallels/workspace/.pyenv/shims/python3
